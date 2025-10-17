@@ -1,3 +1,3 @@
 #!/bin/bash
 
-echo "Linux é power"
+echo "Linux não é power"
