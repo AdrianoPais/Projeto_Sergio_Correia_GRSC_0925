@@ -185,9 +185,9 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     echo "Range DHCP: $IP_RANGE_INICIO - $IP_RANGE_FIM"
     echo "IP Gateway: $IP_GATEWAY"
     echo "IP DNS: $IP_DNS"
-    echo "Domain Name: $DOMAIN_NAME"
     echo "IP Broadcast: $IP_BROADCAST"
     echo "IP de Rede: $IP_REDE"
+    echo "Domain Name: $DOMAIN_NAME"
 
 
     # 4.10 - Solicitar confirmação final
@@ -215,7 +215,7 @@ for i in {1..40}; do
 done
 
 echo " ]"
-echo " Feito!"
+echo "Feito!"
 
 
 # 5 - Deteção e Configuração da Placa de Rede
@@ -373,6 +373,7 @@ sudo tee /etc/kea/kea-dhcp4.conf << DHCP
     }
   ]
 }
+}
 DHCP
 
 sudo chmod 644 /etc/kea/kea-dhcp4.conf
@@ -393,9 +394,17 @@ fi
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da firewall é independente do serviço DHCP utilizado.
 
-sudo firewall-cmd --permanent --add-service=
-sudo firewall-cmd --run-time-to-permanent
+sudo firewall-cmd --permanent --add-service=dhcp
+echo "Serviço adicionado à Firewall."
+sleep 0.5
+
+sudo firewall-cmd --runtime-to-permanent
+echo "Alterações temporárias aplicadas permanentemente na firewall."
+echo 0.5
+
 sudo systemctl restart firewalld
+echo "Serviço firewalld reiniciado."
+sleep 0.5
 
 # 8 - Restart dos Services
 # O que faz: Inicia o serviço do servidor DHCP (dhcpd) e garante que ele arranca automaticamente no boot. O sudo journalctl é usado para mostrar os logs do serviço, confirmando que o DHCP está ativo e a funcionar.
@@ -404,9 +413,20 @@ sudo systemctl restart firewalld
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois o controlo dos serviços é independente do serviço DHCP utilizado.
 
 sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+echo "Iniciando o serviço Kea DHCP4..."
+sleep 0.5
+
 sudo systemctl enable --now kea-dhcp4
+echo "Serviço Kea DHCP4 iniciado e habilitado para iniciar no boot."
+sleep 0.5
+
 sudo systemctl restart kea-dhcp4
+echo "Serviço Kea DHCP4 reiniciado."
+sleep 0.5
+
 sudo systemctl status kea-dhcp4
+echo "Serviço Kea DHCP4 está ativo."
+sleep 0.5
 
 #echo "Journal, para mostrar que os logs estão active."
 #sudo journalctl -u dhcpd -f
