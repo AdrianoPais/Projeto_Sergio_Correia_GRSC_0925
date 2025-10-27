@@ -21,6 +21,10 @@
 
 # Commit
 
+# Instalar e executar dos2unix para corrigir possíveis problemas de quebra de linha
+sudo dnf install -y dos2unix
+dos2unix "$0"  # Converte o próprio script
+
 # 1 - Instalação do Service
 # O que faz: Instala o servidor DHCP KEA usando o gestor de pacotes DNF. Ao contrário de DHCP tradicional (dhcpd), o KEA vai usar o dnf para instalação.
 # O que faz o -y: Responde "sim" automaticamente a todas as perguntas durante a instalação, permitindo que o processo seja não interativo.
@@ -28,10 +32,6 @@
 # O que difere de DHCP tradicional (dhcpd): O KEA DHCP4 é uma alternativa moderna ao dhcpd, instalado em CentOS 10 como norma.
 
 set -e
-
-# Instalar e executar dos2unix para corrigir possíveis problemas de quebra de linha
-sudo dnf install -y dos2unix
-dos2unix "$0"  # Converte o próprio script
 
 chmod 775 config_kea.sh
 
