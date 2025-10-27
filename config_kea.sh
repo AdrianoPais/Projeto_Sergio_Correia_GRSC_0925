@@ -30,9 +30,15 @@ dos2unix config_kea.sh
 
 # O que difere de DHCP tradicional (dhcpd): O KEA DHCP4 é uma alternativa moderna ao dhcpd, instalado em CentOS 10 como norma.
 
+# O que faz o set -e: Configura o script para sair imediatamente se qualquer comando retornar um código de erro diferente de zero, garantindo que erros são tratados imediatamente.
+
 set -e
 
+# O que faz o chmod 775: Define as permissões do ficheiro para que o proprietário e o grupo possam ler, escrever e executar, enquanto outros utilizadores podem ler e executar.
+
 chmod 775 config_kea.sh
+
+# O que faz o dnf install -y kea: Instala o pacote KEA DHCP4 usando o gestor de pacotes DNF com a opção -y para automatizar a instalação.
 
 sudo dnf install -y kea
 
