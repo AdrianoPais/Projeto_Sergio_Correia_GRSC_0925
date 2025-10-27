@@ -300,7 +300,6 @@ ip addr show "$INTERFACE"
 
 # O que difere de DHCP tradicional: A configuração do Kea DHCPv4 é baseada em JSON, diferente do formato tradicional usado pelo dhcpd, que é baseado em texto simples.
 
-# Add directory and file permissions before Kea config
 sudo mkdir -p /etc/kea
 sudo chmod 755 /etc/kea
 sudo chown root:root /etc/kea
@@ -311,52 +310,74 @@ sudo chown root:root /var/log/kea
 
 sudo tee /etc/kea/kea-dhcp4.conf << DHCP
 {
-  "Dhcp4": {
-    "interfaces-config": { "interfaces": [ "${INTERFACE}" ] },
-    "lease-database": {
-      "type": "memfile",
-      "lfc-interval": 3600
+"Dhcp4": {
+    "interfaces-config": {
+        // specify network interfaces to listen on
+        "interfaces": [ "enp1s0" ]
     },
-    "valid-lifetime": 7200,
-    "renew-timer": 1800,
-    "rebind-timer": 3600,
+    "expired-leases-processing": {
+        "reclaim-timer-wait-time": 10,
+        "flush-reclaimed-timer-wait-time": 25,
+        "hold-reclaimed-time": 3600,
+        "max-reclaim-leases": 100,
+        "max-reclaim-time": 250,
+        "unwarned-reclaim-cycles": 5
+    },
+    "renew-timer": 900,
+    "rebind-timer": 1800,
+    "valid-lifetime": 3600,
     "option-data": [
-      { "name": "domain-name-servers", "data": "${IP_DNS}" },
-      { "name": "routers", "data": "${IP_GATEWAY}" },
-      { "name": "subnet-mask", "data": "255.255.255.0" },
-      { "name": "broadcast-address", "data": "${IP_BROADCAST}" }
+        {
+            "name": "domain-name-servers",
+            "data": "10.0.0.10"
+        },
+        {
+            "name": "domain-name",
+            "data": "srv.world"
+        },
+        {
+            "name": "domain-search",
+            "data": "srv.world"
+        }
     ],
     "subnet4": [
-      {
-        "subnet": "${IP_REDE}/24",
-        "pools": [ { "pool": "${IP_RANGE_INICIO} - ${IP_RANGE_FIM}" } ]
-      }
+        {
+            "id": 1,
+            "subnet": "10.0.0.0/24",
+            "pools": [ { "pool": "10.0.0.200 - 10.0.0.254" } ],
+            "option-data": [
+                {
+                    "name": "routers",
+                    "data": "10.0.0.1"
+                }
+            ]
+        }
     ],
     "loggers": [
-      {
+    {
         "name": "kea-dhcp4",
-        "output_options": [ { "output": "/var/log/kea-dhcp4.log" } ],
+        "output-options": [
+            {
+                "output": "/var/log/kea/kea-dhcp4.log"
+            }
+        ],
         "severity": "INFO",
         "debuglevel": 0
-      }
-    ]
-  }
+    }
+  ]
 }
 DHCP
 
-# Set proper config file permissions
 sudo chmod 644 /etc/kea/kea-dhcp4.conf
 sudo chown root:root /etc/kea/kea-dhcp4.conf
 
-# Create and set permissions for log file
 sudo touch /var/log/kea-dhcp4.log
 sudo chmod 644 /var/log/kea-dhcp4.log
 sudo chown root:root /var/log/kea-dhcp4.log
 
-# Add error handling for service restart
 echo "Validating Kea DHCP4 configuration..."
 if ! sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf; then
-    echo "Error: Invalid configuration detected. Please check the configuration file."
+    echo "Erro: Configuração inválida detetada. Por favor, reveja o ficheiro de configuração."
     exit 1
 fi
 
@@ -365,7 +386,8 @@ fi
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da firewall é independente do serviço DHCP utilizado.
 
-sudo firewall-cmd --permanent --add-service=dhcp
+sudo firewall-cmd --permanent --add-service=
+sudo firewall-cmd --run-time-to-permanent
 sudo systemctl restart firewalld
 
 # 8 - Restart dos Services
