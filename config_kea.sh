@@ -33,7 +33,7 @@ set -e
 sudo dnf install -y dos2unix
 dos2unix "$0"  # Converte o próprio script
 
-chmod 775 config_kea_dhcp.sh
+chmod 775 config_kea.sh
 
 sudo dnf install -y kea
 
