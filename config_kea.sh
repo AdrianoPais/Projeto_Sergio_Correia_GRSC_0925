@@ -101,6 +101,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     read -p "Qual vai ser o fim do range DHCP (4º octeto)? " OCTETO_FIM_RANGE
     read -p "Inserir o 4º octeto do IP de Gateway (1 ou 254): " OCTETO_IP_GATEWAY
     read -p "Inserir o IP de DNS (8.8.8.8 ou 1.1.1.1): " IP_DNS
+    read -p "Inserir o nome do domínio (ex: empresa.local): " DOMAIN_NAME
 
     # 4.2 - Extrair a subrede do servidor
 	# O que faz: Usa o cut para extrair os primeiros três octetos do IP do servidor, formando a sub-rede.
@@ -178,6 +179,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     echo "Range DHCP: $IP_RANGE_INICIO - $IP_RANGE_FIM"
     echo "IP Gateway: $IP_GATEWAY"
     echo "IP DNS: $IP_DNS"
+    echo "Domain Name: $DOMAIN_NAME"
     echo "IP Broadcast: $IP_BROADCAST"
     echo "IP de Rede: $IP_REDE"
 
@@ -312,8 +314,7 @@ sudo tee /etc/kea/kea-dhcp4.conf << DHCP
 {
 "Dhcp4": {
     "interfaces-config": {
-        // specify network interfaces to listen on
-        "interfaces": [ "enp1s0" ]
+        "interfaces": [ "${INTERFACE}" ]
     },
     "expired-leases-processing": {
         "reclaim-timer-wait-time": 10,
@@ -329,26 +330,26 @@ sudo tee /etc/kea/kea-dhcp4.conf << DHCP
     "option-data": [
         {
             "name": "domain-name-servers",
-            "data": "10.0.0.10"
+            "data": "${IP_DNS}"
         },
         {
             "name": "domain-name",
-            "data": "srv.world"
+            "data": "${DOMAIN_NAME}"
         },
         {
             "name": "domain-search",
-            "data": "srv.world"
+            "data": "${DOMAIN_NAME}"
         }
     ],
     "subnet4": [
         {
             "id": 1,
-            "subnet": "10.0.0.0/24",
-            "pools": [ { "pool": "10.0.0.200 - 10.0.0.254" } ],
+            "subnet": "${IP_REDE}/24",
+            "pools": [ { "pool": "${IP_RANGE_INICIO} - ${IP_RANGE_FIM}" } ],
             "option-data": [
                 {
                     "name": "routers",
-                    "data": "10.0.0.1"
+                    "data": "${IP_GATEWAY}"
                 }
             ]
         }
