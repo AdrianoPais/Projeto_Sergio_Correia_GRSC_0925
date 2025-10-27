@@ -453,48 +453,52 @@ sleep 0.5
 # O que faz o *) : Captura qualquer entrada que não corresponda às opções listadas anteriormente, funcionando como um "default" em outras linguagens de programação.
 # O qur faz o esac: Indica o fim da estrutura case em bash.
 
-echo ""
-echo "Deseja executar verificações finais?"
-echo "1) Verificar status do serviço;"
-echo "2) Ver leases atribuídos;"
-echo "3) Ver últimas linhas do log;"
-echo "4) Sair."
-echo ""
-read -p "Escolha uma opção (1-4): " OPCAO_VERIFICACAO
 
-case $OPCAO_VERIFICACAO in
-    1)
-        echo ""
-        echo "--- Status do Serviço Kea DHCP4 ---"
-        sudo systemctl status kea-dhcp4
-        ;;
-    2)
-        echo ""
-        echo "--- Leases Atribuídos ---"
-        if [ -f /var/lib/kea/kea-leases4.csv ]; then
-            cat /var/lib/kea/kea-leases4.csv
-        else
-            echo "Ainda não existem leases atribuídos."
-        fi
-        ;;
-    3)
-        echo ""
-        echo "--- Últimas 10 linhas do Log ---"
-        if [ -f /var/log/kea-dhcp4.log ]; then
-            tail -n 10 /var/log/kea-dhcp4.log
-        else
-            echo "Ficheiro de log ainda não existe."
-        fi
-        ;;
-    4)
-        echo ""
-        echo "A sair sem verificações."
-        ;;
-    *)
-        echo ""
-        echo "Opção inválida. A sair sem verificações."
-        ;;
-esac
+while true; do
+    echo ""
+    echo "Deseja executar verificações finais?"
+    echo "1) Verificar status do serviço;"
+    echo "2) Ver leases atribuídos;"
+    echo "3) Ver últimas linhas do log;"
+    echo "4) Sair."
+    echo ""
+    read -p "Escolha uma opção (1-4): " OPCAO_VERIFICACAO
+
+    case $OPCAO_VERIFICACAO in
+        1)
+            echo ""
+            echo "--- Status do Serviço Kea DHCP4 ---"
+            sudo systemctl status kea-dhcp4
+            ;;
+        2)
+            echo ""
+            echo "--- Leases Atribuídos ---"
+            if [ -f /var/lib/kea/kea-leases4.csv ]; then
+                cat /var/lib/kea/kea-leases4.csv
+            else
+                echo "Ainda não existem leases atribuídos."
+            fi
+            ;;
+        3)
+            echo ""
+            echo "--- Últimas 10 linhas do Log ---"
+            if [ -f /var/log/kea-dhcp4.log ]; then
+                tail -n 10 /var/log/kea-dhcp4.log
+            else
+                echo "Ficheiro de log ainda não existe."
+            fi
+            ;;
+        4)
+            echo ""
+            echo "A sair do menu de verificações."
+            break
+            ;;
+        *)
+            echo ""
+            echo "Opção inválida. Por favor, escolha entre 1 e 4."
+            ;;
+    esac
+done
 
 echo ""
 echo "Comandos úteis para o futuro:"
