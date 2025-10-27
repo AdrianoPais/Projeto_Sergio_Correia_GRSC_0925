@@ -24,8 +24,6 @@ dos2unix config_kea.sh
 # =========================================================================================#
 #
 
-# Commit
-
 # 1 - Instalação do Service
 # O que faz: Instala o servidor DHCP KEA usando o gestor de pacotes DNF. Ao contrário de DHCP tradicional (dhcpd), o KEA vai usar o dnf para instalação.
 # O que faz o -y: Responde "sim" automaticamente a todas as perguntas durante a instalação, permitindo que o processo seja não interativo.
