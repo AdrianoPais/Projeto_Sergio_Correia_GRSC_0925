@@ -29,9 +29,13 @@
 
 set -e
 
+# Instalar e executar dos2unix para corrigir possíveis problemas de quebra de linha
+sudo dnf install -y dos2unix
+dos2unix "$0"  # Converte o próprio script
+
 chmod 775 config_kea_dhcp.sh
 
-sudo dnf install -y kea-dhcp4
+sudo dnf install -y kea
 
 # 2 - Criação do backup config
 # O que faz: Cria uma cópia de segurança do ficheiro de configuração original do KEA DHCP4, caso este exista e ainda não tenha sido feito um backup.
