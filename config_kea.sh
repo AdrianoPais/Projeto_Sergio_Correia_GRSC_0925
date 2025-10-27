@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# Instalar e executar dos2unix para corrigir possíveis problemas de quebra de linha
+sudo dnf install -y dos2unix
+dos2unix config_kea.sh
+
 # Devido a limitações de conhecimento, este programa vai operar unicamente sobre um CIDR /24. Esperamos, no futuro, alargar a escolha.
 
 #
@@ -20,10 +25,6 @@
 #
 
 # Commit
-
-# Instalar e executar dos2unix para corrigir possíveis problemas de quebra de linha
-sudo dnf install -y dos2unix
-dos2unix "$0"  # Converte o próprio script
 
 # 1 - Instalação do Service
 # O que faz: Instala o servidor DHCP KEA usando o gestor de pacotes DNF. Ao contrário de DHCP tradicional (dhcpd), o KEA vai usar o dnf para instalação.
