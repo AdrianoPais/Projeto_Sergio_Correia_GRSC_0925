@@ -254,15 +254,21 @@ fi
 
 echo "A usar interface: $INTERFACE"
 
-sudo nmcli connection modify "$INTERFACE" ipv4.method manual
-echo "Placa de rede $INTERFACE alterada para manual."
+echo "Configurando interface de rede..."
+sudo nmcli connection modify "$INTERFACE" \
+    ipv4.method manual \
+    ipv4.addresses "$IP_SERVIDOR/24" \
+    ipv4.gateway "$IP_GATEWAY" \
+    ipv4.dns "$IP_DNS"
+echo "Configurações de rede aplicadas."
 
-sudo nmcli connection modify "$INTERFACE" ipv4.addresses "$IP_SERVIDOR/24"
-echo "IP alterado para $IP_SERVIDOR/24."
-
-sudo nmcli connection down "$INTERFACE"
-sudo nmcli connection up "$INTERFACE"
+echo "A reiniciar a interface de rede..."
+sudo nmcli connection down "$INTERFACE" && sudo nmcli connection up "$INTERFACE"
 echo "Restart da interface $INTERFACE concluído."
+
+# Verificar a configuração
+echo "A verificar a configuração de rede..."
+ip addr show "$INTERFACE"
 
 # 6 - Edição do Config do DHCP (Kea)
 # O que faz: Escreve o ficheiro de configuração JSON do Kea DHCPv4 com os parâmetros fornecidos.
