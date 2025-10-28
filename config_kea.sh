@@ -1,8 +1,8 @@
 #!/bin/bash
+dos2unix config_kea.sh
 
 # Instalar e executar dos2unix para corrigir possíveis problemas de quebra de linha
 sudo dnf install -y dos2unix
-dos2unix config_kea.sh
 
 # Devido a limitações de conhecimento, este programa vai operar unicamente sobre um CIDR /24. Esperamos, no futuro, alargar a escolha.
 
@@ -184,7 +184,6 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     echo "IP Servidor: $IP_SERVIDOR"
     echo "Range DHCP: $IP_RANGE_INICIO - $IP_RANGE_FIM"
     echo "IP Gateway: $IP_GATEWAY"
-    echo "IP DNS: $IP_DNS"
     echo "IP Broadcast: $IP_BROADCAST"
     echo "IP de Rede: $IP_REDE"
     echo "Domain Name: $DOMAIN_NAME"
@@ -217,6 +216,25 @@ done
 echo " ]"
 echo "Feito!"
 
+# Pergunta ao utilizador se quer acesso à Internet
+read -p "Deseja que os clientes tenham acesso à Internet? (y/N): " ACESSO_INTERNET
+ACESSO_INTERNET=${ACESSO_INTERNET,,}
+
+if [ "$ACESSO_INTERNET" == "y" ]; then
+    ACESSO=1
+    GATEWAY="$IP_SERVIDOR"
+    read -p "Insira o IP de DNS (Exemplo: 8.8.8.8 ou 1.1.1.1): " IP_DNS
+    if [[ "$IP_DNS" != "8.8.8.8" && "$IP_DNS" != "1.1.1.1" ]]; then
+        echo "Erro 5! Valor inválido. DNS ficará a 1.1.1.1 por omissão."
+        IP_DNS="1.1.1.1"
+    fi
+    echo "Acesso à Internet ativado."
+else
+    ACESSO=0
+    GATEWAY=""
+    IP_DNS=""
+    echo "Apenas atribuição de IP, sem acesso à Internet."
+fi
 
 # 5 - Deteção e Configuração da Placa de Rede
 # O que faz: Deteta automaticamente a interface de rede ativa e pede confirmação ao utilizador.
@@ -234,52 +252,92 @@ echo "Feito!"
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da interface de rede é independente do serviço DHCP utilizado.
 
-INTERFACE=$(nmcli -t -f DEVICE connection show --active | head -n1)
+# 5 - Deteção e Configuração das Placas de Rede
+# Agora o script vai configurar DUAS interfaces:
+#  - Uma (WAN) que recebe Internet via NAT (DHCP)
+#  - Outra (LAN) com IP fixo para o DHCP KEA
 
-if [ -z "$INTERFACE" ]; then
-    echo "Aviso: Nenhuma interface ativa detetada automaticamente!"
-    read -p "Insira o nome da interface manualmente (ex: enp0s3, eth0): " INTERFACE
-else
-    echo "Interface de rede detetada: $INTERFACE"
-    read -p "Esta é a interface correta? (y/n): " CONFIRMA_INTERFACE
-    
-    if [[ "$CONFIRMA_INTERFACE" != "y" && "$CONFIRMA_INTERFACE" != "Y" ]]; then
-        read -p "Insira o nome da interface manualmente: " INTERFACE
-        echo "Interface alterada para: $INTERFACE"
-    fi
-fi
+echo ""
+echo "=== Configuração de Interfaces ==="
+echo ""
 
-# 5.1 Validação final da interface
-# O que faz: Verifica se a interface especificada pelo utilizador existe no sistema.
+nmcli device status | grep ethernet
+echo ""
+read -p "Qual é a interface WAN (NAT)? " WAN_IF
+read -p "Qual é a interface LAN (para DHCP)? " LAN_IF
 
-# O que faz o dev/null: Redireciona a saída padrão para /dev/null, suprimindo qualquer saída do comando no terminal.
-# O que faz o &>: Redireciona tanto a saída padrão quanto a saída de erro para o destino especificado (neste caso, /dev/null).
-# O que faz o exit 1: Sai do script com um código de status 1, indicando que ocorreu um erro.
+echo ""
+echo "A configurar interface WAN ($WAN_IF) para obter IP por DHCP..."
+sleep 1
+sudo nmcli connection add type ethernet ifname "$WAN_IF" con-name WAN ipv4.method auto || true
+sudo nmcli connection up WAN || sudo nmcli connection up "$WAN_IF"
 
-if ! nmcli connection show "$INTERFACE" &>/dev/null; then
-    echo "Erro: A interface '$INTERFACE' não existe no sistema!"
-    echo "Interfaces disponíveis:"
-    nmcli connection show
-    exit 1
-fi
+# Mostrar IP obtido pela WAN
+WAN_IP=$(ip -4 addr show "$WAN_IF" | grep inet | awk '{print $2}' | head -n1)
+echo "Interface WAN configurada com IP: ${WAN_IP:-"A aguardar DHCP..."}"
 
-echo "A usar interface: $INTERFACE"
+# Configurar LAN com IP do utilizador (já definido anteriormente)
+echo ""
+echo "A configurar interface LAN ($LAN_IF) com IP $IP_SERVIDOR/24..."
+sleep 1
+sudo nmcli connection add type ethernet ifname "$LAN_IF" con-name LAN ipv4.method manual ipv4.addresses "$IP_SERVIDOR/24" || true
+sudo nmcli connection modify LAN ipv4.gateway "$IP_GATEWAY" ipv4.dns "$IP_DNS"
+sudo nmcli connection up LAN || sudo nmcli connection up "$LAN_IF"
 
-echo "Configurando interface de rede..."
-sudo nmcli connection modify "$INTERFACE" \
-    ipv4.method manual \
-    ipv4.addresses "$IP_SERVIDOR/24" \
-    ipv4.gateway "$IP_GATEWAY" \
-    ipv4.dns "$IP_DNS"
-echo "Configurações de rede aplicadas."
+echo ""
+echo "Interfaces configuradas:"
+sleep 1
+ip -4 addr show "$WAN_IF"
+ip -4 addr show "$LAN_IF"
 
-echo "A reiniciar a interface de rede..."
-sudo nmcli connection down "$INTERFACE" && sudo nmcli connection up "$INTERFACE"
-echo "Restart da interface $INTERFACE concluído."
+# 5.1 - Ativar IP Forwarding
+# O que faz: Ativa o encaminhamento de IP no sistema, permitindo que o tráfego de rede seja roteado entre diferentes interfaces.
+# O que faz o sysctl -w net.ipv4.ip_forward=1: Ativa o encaminhamento de IP temporariamente, até ao próximo reboot.
+# O que faz o tee -a /etc/sysctl.conf: Adiciona a configuração de encaminhamento de IP ao ficheiro sysctl.conf para que a alteração seja persistente após reboot.
 
-# Verificar a configuração
-echo "A verificar a configuração de rede..."
-ip addr show "$INTERFACE"
+echo ""
+echo "Ativando IP forwarding..."
+sleep 1
+sudo sysctl -w net.ipv4.ip_forward=1
+echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf > /dev/null
+
+# 5.2 - Configurar NAT (masquerading)
+# O que faz: Configura regras de NAT (Network Address Translation) usando iptables para permitir que os dispositivos na rede LAN acedam à Internet através da interface WAN.
+# O que faz o iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE: Adiciona uma regra à tabela NAT para mascarar os endereços IP de origem dos pacotes que saem pela interface WAN.
+
+echo ""
+echo "Aplicando regras de NAT..."
+sleep 1
+sudo iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE
+sudo iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -j ACCEPT
+sudo iptables -A FORWARD -i "$WAN_IF" -o "$LAN_IF" -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+# Tornar as regras persistentes (para reboot)
+# O que faz: Instala o pacote iptables-services para permitir a persistência das regras de iptables após reboot.
+
+echo ""
+echo "A guardar as regras de NAT para persistirem após reboot."
+sleep 1
+sudo dnf install -y iptables-services
+sudo service iptables save
+sudo systemctl enable iptables
+
+# 5.3 - Firewall
+# O que faz: Configura a firewall (firewalld) para permitir o serviço DHCP e ativar o masquerading, garantindo que os clientes possam comunicar com o servidor e aceder à Internet.
+# O que é o masquerade: Técnica de NAT que permite que múltiplos dispositivos numa rede local acedam à Internet usando um único endereço IP público.
+
+echo ""
+echo "A configurar os acessos à firewall..."
+sleep 1
+sudo firewall-cmd --permanent --add-service=dhcp
+sudo firewall-cmd --permanent --add-masquerade
+sudo firewall-cmd --reload
+
+echo ""
+echo "Interfaces e NAT configurados com sucesso!"
+sleep 1
+echo "WAN ($WAN_IF) -> Internet via NAT"
+echo "LAN ($LAN_IF) -> IP fixo $IP_SERVIDOR/24 + DHCP KEA"
 
 # 6 - Edição do Config do DHCP (Kea)
 # O que faz: Escreve o ficheiro de configuração JSON do Kea DHCPv4 com os parâmetros fornecidos.
@@ -316,65 +374,117 @@ sudo mkdir -p /var/log/kea
 sudo chmod 755 /var/log/kea
 sudo chown root:root /var/log/kea
 
-sudo tee /etc/kea/kea-dhcp4.conf << DHCP
+if [ "$ACESSO" == "1" ]; then
+    # Acesso à Internet ativado
+    IP_GATEWAY="$IP_SERVIDOR"
+    sudo tee /etc/kea/kea-dhcp4.conf << DHCP
 {
-"Dhcp4": {
-    "interfaces-config": {
-        "interfaces": [ "${INTERFACE}" ]
-    },
-    "expired-leases-processing": {
-        "reclaim-timer-wait-time": 10,
-        "flush-reclaimed-timer-wait-time": 25,
-        "hold-reclaimed-time": 3600,
-        "max-reclaim-leases": 100,
-        "max-reclaim-time": 250,
-        "unwarned-reclaim-cycles": 5
-    },
-    "renew-timer": 900,
-    "rebind-timer": 1800,
-    "valid-lifetime": 3600,
-    "option-data": [
-        {
-            "name": "domain-name-servers",
-            "data": "${IP_DNS}"
+    "Dhcp4": {
+        "interfaces-config": {
+            "interfaces": [ "${LAN_IF}" ]
         },
-        {
-            "name": "domain-name",
-            "data": "${DOMAIN_NAME}"
+        "expired-leases-processing": {
+            "reclaim-timer-wait-time": 10,
+            "flush-reclaimed-timer-wait-time": 25,
+            "hold-reclaimed-time": 3600,
+            "max-reclaim-leases": 100,
+            "max-reclaim-time": 250,
+            "unwarned-reclaim-cycles": 5
         },
-        {
-            "name": "domain-search",
-            "data": "${DOMAIN_NAME}"
-        }
-    ],
-    "subnet4": [
-        {
-            "id": 1,
-            "subnet": "${IP_REDE}/24",
-            "pools": [ { "pool": "${IP_RANGE_INICIO} - ${IP_RANGE_FIM}" } ],
-            "option-data": [
-                {
-                    "name": "routers",
-                    "data": "${IP_GATEWAY}"
-                }
-            ]
-        }
-    ],
-    "loggers": [
-    {
-        "name": "kea-dhcp4",
-        "output-options": [
+        "renew-timer": 900,
+        "rebind-timer": 1800,
+        "valid-lifetime": 3600,
+        "option-data": [
             {
-                "output": "/var/log/kea/kea-dhcp4.log"
+                "name": "domain-name-servers",
+                "data": "${IP_DNS}"
+            },
+            {
+                "name": "domain-name",
+                "data": "${DOMAIN_NAME}"
+            },
+            {
+                "name": "domain-search",
+                "data": "${DOMAIN_NAME}"
             }
         ],
-        "severity": "INFO",
-        "debuglevel": 0
+        "subnet4": [
+            {
+                "id": 1,
+                "subnet": "${IP_REDE}/24",
+                "pools": [
+                    { "pool": "${IP_RANGE_INICIO} - ${IP_RANGE_FIM}" }
+                ],
+                "option-data": [
+                    {
+                        "name": "routers",
+                        "data": "${IP_GATEWAY}"
+                    }
+                ]
+            }
+        ],
+        "loggers": [
+            {
+                "name": "kea-dhcp4",
+                "output-options": [
+                    { "output": "/var/log/kea/kea-dhcp4.log" }
+                ],
+                "severity": "INFO",
+                "debuglevel": 0
+            }
+        ]
     }
-  ]
-}
 }
 DHCP
+
+else
+    # Acesso à Internet desativado
+    sudo tee /etc/kea/kea-dhcp4.conf << DHCP
+{
+    "Dhcp4": {
+        "interfaces-config": {
+            "interfaces": [ "${LAN_IF}" ]
+        },
+        "expired-leases-processing": {
+            "reclaim-timer-wait-time": 10,
+            "flush-reclaimed-timer-wait-time": 25,
+            "hold-reclaimed-time": 3600,
+            "max-reclaim-leases": 100,
+            "max-reclaim-time": 250,
+            "unwarned-reclaim-cycles": 5
+        },
+        "renew-timer": 900,
+        "rebind-timer": 1800,
+        "valid-lifetime": 3600,
+        "option-data": [
+            {
+                "name": "domain-name",
+                "data": "${DOMAIN_NAME}"
+            }
+        ],
+        "subnet4": [
+            {
+                "id": 1,
+                "subnet": "${IP_REDE}/24",
+                "pools": [
+                    { "pool": "${IP_RANGE_INICIO} - ${IP_RANGE_FIM}" }
+                ]
+            }
+        ],
+        "loggers": [
+            {
+                "name": "kea-dhcp4",
+                "output-options": [
+                    { "output": "/var/log/kea/kea-dhcp4.log" }
+                ],
+                "severity": "INFO",
+                "debuglevel": 0
+            }
+        ]
+    }
+}
+DHCP
+fi
 
 sudo chmod 644 /etc/kea/kea-dhcp4.conf
 sudo chown root:root /etc/kea/kea-dhcp4.conf
@@ -383,10 +493,11 @@ sudo touch /var/log/kea-dhcp4.log
 sudo chmod 644 /var/log/kea-dhcp4.log
 sudo chown root:root /var/log/kea-dhcp4.log
 
-echo "Validating Kea DHCP4 configuration..."
+echo "A validar as configurações do Kea DHCP4..."
 if ! sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf; then
     echo "Erro: Configuração inválida detetada. Por favor, reveja o ficheiro de configuração."
     exit 1
+    sleep 2
 fi
 
 # 7 - Add o Service à firewall
@@ -400,7 +511,7 @@ sleep 0.5
 
 sudo firewall-cmd --runtime-to-permanent
 echo "Alterações temporárias aplicadas permanentemente na firewall."
-echo 0.5
+sleep 0.5
 
 sudo systemctl restart firewalld
 echo "Serviço firewalld reiniciado."
@@ -413,19 +524,15 @@ sleep 0.5
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois o controlo dos serviços é independente do serviço DHCP utilizado.
 
 sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-echo "Iniciando o serviço Kea DHCP4..."
+echo "A iniciar o serviço Kea ..."
 sleep 0.5
 
 sudo systemctl enable --now kea-dhcp4
-echo "Serviço Kea DHCP4 iniciado e habilitado para iniciar no boot."
+echo "Serviço Kea DHCP4 iniciado e pronto para iniciar no arranque."
 sleep 0.5
 
 sudo systemctl restart kea-dhcp4
 echo "Serviço Kea DHCP4 reiniciado."
-sleep 0.5
-
-sudo systemctl status kea-dhcp4
-echo "Serviço Kea DHCP4 está ativo."
 sleep 0.5
 
 #echo "Journal, para mostrar que os logs estão active."
@@ -451,8 +558,7 @@ sleep 0.5
 
 # O que faz o ;;: Indica o fim de um bloco de código dentro de uma estrutura case em bash, semelhante a um break.
 # O que faz o *) : Captura qualquer entrada que não corresponda às opções listadas anteriormente, funcionando como um "default" em outras linguagens de programação.
-# O qur faz o esac: Indica o fim da estrutura case em bash.
-
+# O que faz o esac: Indica o fim da estrutura case em bash.
 
 while true; do
     echo ""
