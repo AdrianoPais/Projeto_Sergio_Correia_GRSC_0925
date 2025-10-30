@@ -13,42 +13,37 @@
 
 set -e
 
-# 1 - Definir permissões do script
-# O que faz: Garante que o script tem permissões corretas para ser executado.
-# O que faz o chmod 775: Define permissões de leitura, escrita e execução para o proprietário e grupo, e leitura e execução para outros.
-
-chmod 775 config_dns_bindV2.sh
-
 echo ""
 echo "=========================================="
 echo "   INSTALAÇÃO: DNS (BIND)"
 echo "=========================================="
 echo ""
 
-# ----------------------------------------------------
+# 1 - Definir permissões do script
+# O que faz: Garante que o script tem permissões corretas para ser executado.
+# O que faz o chmod 775: Define permissões de leitura, escrita e execução para o proprietário e grupo, e leitura e execução para outros.
+
+chmod 775 config_dns_bindV2.sh
+
 # 2 - Recolha de informações do utilizador
 # O que faz: Solicita ao utilizador os dados necessários para configurar o servidor DNS.
-# ----------------------------------------------------
 
 echo ""
 read -p "Introduza o domínio (ex: empresa.local): " DOMINIO
 read -p "Introduza o IP do servidor de Classe C (ex: 192.168.0.10): " IP_SERVIDOR_DNS
 read -p "Introduza o IP do Servidor DHCP/NAT: " IP_FORWARDER
+sleep 0.5
 
-# O que faz o nmcli: Network Manager Command Line Interface - mostra as interfaces de rede disponíveis.
-nmcli
-
-read -p "Indique a interface LAN principal (ex: enp0s3): " LAN_INTERFACE
-read -p "Indique a interface WAN temporária para acesso à Internet (ex: enp0s8): " INTERFACE_WAN_TEMP
+read -p "Indique a interface LAN principal (ex: ens224): " LAN_INTERFACE
+read -p "Indique a interface WAN temporária para acesso à Internet (ex: ens160): " INTERFACE_WAN_TEMP
+sleep 0.5
 
 echo ""
 echo "Informações recolhidas com sucesso!"
 sleep 1
 
-# ----------------------------------------------------
 # 2 - Configuração da interface LAN com IP estático
 # O que faz: Define o endereço IP fixo do servidor DNS na interface de rede local.
-# ----------------------------------------------------
 
 echo ""
 echo "=========================================="
@@ -56,49 +51,62 @@ echo "   CONFIGURAÇÃO DE REDE"
 echo "=========================================="
 echo ""
 
-sudo nmcli connection add type ethernet ifname "$INTERFACE_WAN_TEMP" con-name "$INTERFACE_WAN_TEMP"
+# O que faz: Cria uma nova conexão para a interface WAN temporária (se não existir).
 
+sudo nmcli connection add type ethernet ifname "$INTERFACE_WAN_TEMP" con-name "$INTERFACE_WAN_TEMP"
 echo "A configurar IP estático $IP_SERVIDOR_DNS na interface $LAN_INTERFACE..."
+sleep 0.5
 
 # O que faz o ipv4.addresses: Define o endereço IP e máscara de rede (/24 = 255.255.255.0).
+
 sudo nmcli connection modify "$LAN_INTERFACE" ipv4.addresses "$IP_SERVIDOR_DNS/24"
+echo "Alterar a LAN_INTERFACE para IP $IP_SERVIDOR_DNS/24"
+sleep 0.5
 
 # O que faz o ipv4.method manual: Desativa DHCP e força configuração manual de IP.
+
 sudo nmcli connection modify "$LAN_INTERFACE" ipv4.method manual
+echo "Definir método de IP para manual"
+sleep 0.5
 
 # O que faz o ipv4.gateway: Define o gateway padrão (router) para acesso à rede externa.
-sudo nmcli connection modify "$LAN_INTERFACE" ipv4.gateway "$IP_FORWARDER"
 
-# O que faz o connection up: Recarrega a interface LAN com as novas configurações aplicadas.
+sudo nmcli connection modify "$LAN_INTERFACE" ipv4.gateway "$IP_FORWARDER"
+echo "Definir gateway para $IP_FORWARDER"
+sleep 0.5
+
+# O que faz o connection up: Reload da interface LAN com as novas configurações aplicadas.
+
 sudo nmcli connection up "$LAN_INTERFACE"
+echo "Aplicar configurações na interface $LAN_INTERFACE"
+sleep 0.5
 
 echo "Configuração da interface LAN concluída."
-sleep 1
+sleep 0.5
 
-# ----------------------------------------------------
 # 3 - Ativação da interface WAN temporária
-# O que faz: Ativa temporariamente uma segunda interface de rede para permitir a instalação de pacotes via Internet.
-# Porquê: Precisamos de conectividade para executar 'dnf install', mas esta interface será removida depois.
-# ----------------------------------------------------
+# O que faz: Liga a interface WAN temporária para permitir acesso à Internet durante a instalação.
+# O que faz o ||: Operador lógico OR - tenta o primeiro comando (device connect), se falhar executa o segundo (connection up).
 
 echo ""
 echo "A ativar interface $INTERFACE_WAN_TEMP para acesso temporário à Internet..."
 
-# O que faz o ||: Operador lógico OR - tenta o primeiro comando (device connect), se falhar executa o segundo (connection up).
 sudo nmcli device connect "$INTERFACE_WAN_TEMP" || sudo nmcli connection up "$INTERFACE_WAN_TEMP"
+echo "Interface $INTERFACE_WAN_TEMP ativada."
 
-# O que faz o sleep 7: Aguarda 7 segundos para dar tempo ao DHCP atribuir um IP à interface.
-sleep 5
+echo -n "A carregar: "
+for i in {1..50}; do
+    printf "\rA carregar: [%-50s]" "$(printf '#%.0s' $(seq 1 $i))"
+    sleep 0.1
+done
 
-# ----------------------------------------------------
 # 4 - Teste de conectividade à Internet
 # O que faz: Verifica se o servidor consegue aceder à Internet antes de instalar pacotes.
-# ----------------------------------------------------
-
-echo "Teste de conectividade antes da instalação."
 
 # O que faz o ping -c 3: Envia 3 pacotes ICMP para o servidor DNS público do Google (8.8.8.8).
 # O que faz o 8.8.8.8: Endereço IP do servidor DNS público do Google, usado para testar conectividade.
+
+echo "Teste de conectividade antes da instalação."
 
 ping -c 3 8.8.8.8
 
@@ -106,10 +114,18 @@ echo "Conectividade confirmada!"
 sleep 1
 echo ""
 
-# ----------------------------------------------------
 # 5 - Instalação do BIND
 # O que faz: Instala o servidor DNS BIND e as suas ferramentas de diagnóstico.
-# ----------------------------------------------------
+
+# O que faz o dnf install: Gestor de pacotes do CentOS/RHEL que instala software.
+# O que faz o -y: Responde automaticamente "sim" a todas as perguntas durante a instalação.
+# O que faz o bind: Pacote principal do servidor DNS BIND.
+# O que faz o bind-utils: Ferramentas úteis como dig, nslookup, host para testar DNS.
+# O que faz o nmcli con mod: Modifica a configuração da conexão de rede.
+# O que faz o ipv4.dns: Define o servidor DNS para a interface de rede.
+# O que faz o ens224: Nome da interface de rede principal (LAN).
+
+# O que é localhost: Endereço IP de loopback.
 
 echo ""
 echo "=========================================="
@@ -118,11 +134,6 @@ echo "=========================================="
 echo ""
 
 echo "A instalar BIND..."
-
-# O que faz o dnf install: Gestor de pacotes do CentOS/RHEL que instala software.
-# O que faz o -y: Responde automaticamente "sim" a todas as perguntas durante a instalação.
-# O que faz o bind: Pacote principal do servidor DNS BIND.
-# O que faz o bind-utils: Ferramentas úteis como dig, nslookup, host para testar DNS.
 
 sudo nmcli con mod ens224 ipv4.dns "8.8.8.8"
 sudo nmcli con up ens224
@@ -135,67 +146,43 @@ sleep 1
 localhost="127.0.0.1"
 sudo nmcli con mod ens224 ipv4.dns "$localhost"
 
-# ----------------------------------------------------
-# 6 - Limpeza da interface WAN temporária
-# O que faz: Remove a interface WAN temporária que foi usada apenas para instalar pacotes.
-# Porquê: Após a instalação, queremos que o servidor use apenas a interface LAN e o seu próprio DNS.
-# ----------------------------------------------------
-
-echo ""
-echo "=========================================="
-echo "   LIMPEZA DE REDE"
-echo "=========================================="
-echo ""
-
-echo "Iniciando a limpeza da interface WAN temporária ($INTERFACE_WAN_TEMP)..."
-
-# O que faz o if: Estrutura condicional que verifica se a interface está ativa antes de tentar removê-la.
-# O que faz o grep -q: Procura silenciosamente (-q) por um padrão de texto na saída do comando.
-# O que faz o "STATE: activated": Texto que indica que a interface está ativa.
-if sudo nmcli device show "$INTERFACE_WAN_TEMP" | grep -q "STATE: activated"; then
-    
-    echo "A desconectar e eliminar a conexão $INTERFACE_WAN_TEMP..."
-    
-    # O que faz o device disconnect: Desativa a interface de rede.
-    sudo nmcli device disconnect "$INTERFACE_WAN_TEMP"
-    
-    # O que faz o connection delete: Remove permanentemente a configuração da interface.
-    sudo nmcli connection delete "$INTERFACE_WAN_TEMP"
-    
-    echo "Interface temporária removida com sucesso."
-else
-    echo "Interface $INTERFACE_WAN_TEMP não estava ativa para remoção."
-fi
-
-sleep 1
+# 6 - Desativação da interface WAN temporária
+# O que faz: Desliga a interface WAN temporária após a instalação para segurança.
 
 sudo nmcli device disconnect "$INTERFACE_WAN_TEMP"
 
-# ----------------------------------------------------
 # 7 - Configurar DNS da interface LAN para localhost
-# O que faz: Define que a interface LAN deve usar o próprio servidor BIND (127.0.0.1) como DNS.
-# Porquê: O servidor DNS deve consultar-se a si próprio, não um DNS externo.
-# ----------------------------------------------------
-
-echo ""
-echo "A definir DNS da interface principal ($LAN_INTERFACE) para 127.0.0.1 (Loopback)..."
+# O que faz: Define o servidor DNS da interface LAN para o próprio servidor (localhost).
 
 # O que faz o ipv4.dns: Define o servidor DNS que a interface irá usar.
 # O que faz o 127.0.0.1: Endereço de loopback (localhost) - faz o servidor usar o seu próprio BIND.
-sudo nmcli connection modify "$LAN_INTERFACE" ipv4.dns "127.0.0.1"
-
 # O que faz o connection up: Recarrega a interface para aplicar a nova configuração de DNS.
+
+echo ""
+echo "A definir DNS da interface principal ($LAN_INTERFACE) para 127.0.0.1 (Loopback)..."
+sleep 0.5
+
+sudo nmcli connection modify "$LAN_INTERFACE" ipv4.dns "127.0.0.1"
+echo "Aplicar configuração de DNS na interface $LAN_INTERFACE..."
+sleep 0.5
+
 sudo nmcli connection up "$LAN_INTERFACE"
+echo "DNS da interface $LAN_INTERFACE definido para localhost."
+sleep 0.5
 
 echo "Limpeza de rede concluída."
-sleep 1
+sleep 0.5
 echo ""
 
-# ----------------------------------------------------
 # 8 - Extrair octetos do IP para criar zona reversa
 # O que faz: Divide o endereço IP em 4 partes (octetos) para poder criar a zona de resolução inversa.
+
 # O que é zona reversa: Permite descobrir o nome de domínio a partir de um endereço IP (IP → nome).
-# ----------------------------------------------------
+# O que faz o REVERSE_ZONE_ID: Cria o nome da zona reversa no formato DNS padrão (in-addr.arpa).
+
+# O que faz o cut -d. -fN: Extrai o N-ésimo octeto do IP usando o ponto (.) como separador.
+
+# O que faz o date +%s: Gera um número de série baseado no timestamp Unix (segundos desde 1 janeiro 1970).
 
 echo ""
 echo "=========================================="
@@ -203,20 +190,13 @@ echo "   PREPARAÇÃO DAS ZONAS DNS"
 echo "=========================================="
 echo ""
 
-# O que faz o cut -d. -fN: Extrai o N-ésimo octeto do IP usando o ponto (.) como separador.
-# Exemplo: Se IP = 192.168.1.10, então OCTETO_1=192, OCTETO_2=168, OCTETO_3=1, OCTETO_4=10
 OCTETO_1=$(echo "$IP_SERVIDOR_DNS" | cut -d'.' -f1)
 OCTETO_2=$(echo "$IP_SERVIDOR_DNS" | cut -d'.' -f2)
 OCTETO_3=$(echo "$IP_SERVIDOR_DNS" | cut -d'.' -f3)
 OCTETO_4=$(echo "$IP_SERVIDOR_DNS" | cut -d'.' -f4)
 
-# O que faz o REVERSE_ZONE_ID: Cria o nome da zona reversa no formato DNS padrão (in-addr.arpa).
-# Exemplo: Para IP 192.168.1.10, cria "1.168.192.in-addr.arpa"
-# Porquê invertido: A notação DNS reversa usa os octetos em ordem inversa.
 REVERSE_ZONE_ID="${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.in-addr.arpa"
 
-# O que faz o date +%s: Gera um número de série baseado no timestamp Unix (segundos desde 1 janeiro 1970).
-# Porquê: O SOA (Start of Authority) precisa de um número de série único para controlar versões da zona.
 SERIAL_DATE=$(date +%s)
 
 echo "Domínio: $DOMINIO"
@@ -226,16 +206,13 @@ echo "Serial Date: $SERIAL_DATE"
 sleep 1
 echo ""
 
-# ----------------------------------------------------
 # 9 - Criar ficheiro de zona direta (Forward Zone)
 # O que faz: Cria o ficheiro que resolve nomes de domínio para endereços IP (nome → IP).
-# Exemplo: empresa.local → 192.168.1.10
-# ----------------------------------------------------
+# O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
+# O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
 
 echo "A criar zona direta (Forward Zone)..."
 
-# O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
-# O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
 sudo tee /var/named/${DOMINIO}.db >/dev/null << EOF
 \$TTL 86400
 @   IN  SOA     ${DOMINIO}. root.${DOMINIO}. (
@@ -261,13 +238,10 @@ EOF
 # - @: Representa o próprio domínio (empresa.local).
 
 echo "Zona direta criada: /var/named/${DOMINIO}.db"
-sleep 1
+sleep 0.5
 
-# ----------------------------------------------------
 # 10 - Criar ficheiro de zona inversa (Reverse Zone)
-# O que faz: Cria o ficheiro que resolve endereços IP para nomes de domínio (IP → nome).
-# Exemplo: 192.168.1.10 → ns.empresa.local
-# ----------------------------------------------------
+# O que faz: Cria o ficheiro que resolve endereços IP para nomes de domínio (IP -> nome).
 
 echo "A criar zona inversa (Reverse Zone)..."
 
@@ -283,12 +257,12 @@ sudo tee /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null << EOF
 ${OCTETO_4} IN  PTR   ns.${DOMINIO}.
 EOF
 
-# Explicação adicional:
-# - PTR: Pointer Record - aponta um endereço IP para um nome de domínio (resolução inversa).
-# - ${OCTETO_4}: Último octeto do IP (ex: se IP é 192.168.1.10, usa apenas o "10").
+# Explicação adicional dos registos PTR:
+# - PTR: Pointer Record - associa um endereço IP a um nome de domínio.
+# - ${OCTETO_4}: Último octeto do IP do servidor DNS.
 
 echo "Zona inversa criada: /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db"
-sleep 1
+sleep 0.5
 echo ""
 
 # ----------------------------------------------------
