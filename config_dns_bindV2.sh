@@ -7,10 +7,8 @@
 #
 # Descrição:
 # Script para automatizar a instalação e configuração do servidor DNS BIND em CentOS Stream 10.
-# Suporta apenas redes de Classe C (/24).
-#
-# NOTA IMPORTANTE: Este script usa 8.8.8.8 como forwarder DNS (não o servidor DHCP/NAT).
-# O IP_FORWARDER é usado apenas como gateway, não como DNS forwarder.
+# Suporta apenas redes de Classe C (/24). Inclui configuração de zonas direta e inversa,
+# validação de configuração, e opções para adicionar registos DNS após a instalação.
 #
 # =========================================================================================#
 
@@ -36,13 +34,13 @@ echo ""
 echo ""
 read -p "Introduza o domínio (ex: empresa.local): " DOMINIO
 read -p "Introduza o IP do servidor de Classe C (ex: 192.168.0.10): " IP_SERVIDOR_DNS
-read -p "Introduza o IP do Servidor DHCP/NAT (Forwarder externo - será ignorado em favor de 8.8.8.8 para DNS): " IP_FORWARDER
+read -p "Introduza o IP do Servidor DHCP/NAT (Forwarder externo): " IP_FORWARDER
 
 # O que faz o nmcli: Network Manager Command Line Interface - mostra as interfaces de rede disponíveis.
 nmcli
 
-read -p "Indique a interface LAN principal (ex: enp0s3): " LAN_INTERFACE
-read -p "Indique a interface WAN temporária para acesso à Internet (ex: enp0s8): " INTERFACE_WAN_TEMP
+read -p "Indique a interface LAN principal (ex: ens224): " LAN_INTERFACE
+read -p "Indique a interface WAN temporária para acesso à Internet (ex: ens160): " INTERFACE_WAN_TEMP
 
 echo ""
 echo "Informações recolhidas com sucesso!"
@@ -535,6 +533,7 @@ echo "=========================================="
 echo "   DNS CONFIGURADO COM SUCESSO!"
 echo "=========================================="
 echo ""
+sudo nmcli device disconnect "$INTERFACE_WAN_TEMP"
 sleep 1
 
 # ----------------------------------------------------
