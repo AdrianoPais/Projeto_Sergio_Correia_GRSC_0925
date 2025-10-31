@@ -42,7 +42,7 @@ echo ""
 echo "Informações recolhidas com sucesso!"
 sleep 1
 
-# 2 - Configuração da interface LAN com IP estático
+# 3 - Configuração da interface LAN com IP estático
 # O que faz: Define o endereço IP fixo do servidor DNS na interface de rede local.
 
 echo ""
@@ -84,7 +84,7 @@ sleep 0.5
 echo "Configuração da interface LAN concluída."
 sleep 0.5
 
-# 3 - Ativação da interface WAN temporária
+# 4 - Ativação da interface WAN temporária
 # O que faz: Liga a interface WAN temporária para permitir acesso à Internet durante a instalação.
 # O que faz o ||: Operador lógico OR - tenta o primeiro comando (device connect), se falhar executa o segundo (connection up).
 
@@ -100,7 +100,7 @@ for i in {1..50}; do
     sleep 0.1
 done
 
-# 4 - Teste de conectividade à Internet
+# 5 - Teste de conectividade à Internet
 # O que faz: Verifica se o servidor consegue aceder à Internet antes de instalar pacotes.
 
 # O que faz o ping -c 3: Envia 3 pacotes ICMP para o servidor DNS público do Google (8.8.8.8).
@@ -114,7 +114,7 @@ echo "Conectividade confirmada!"
 sleep 1
 echo ""
 
-# 5 - Instalação do BIND
+# 6 - Instalação do BIND
 # O que faz: Instala o servidor DNS BIND e as suas ferramentas de diagnóstico.
 
 # O que faz o dnf install: Gestor de pacotes do CentOS/RHEL que instala software.
@@ -146,12 +146,12 @@ sleep 1
 localhost="127.0.0.1"
 sudo nmcli con mod ens224 ipv4.dns "$localhost"
 
-# 6 - Desativação da interface WAN temporária
+# 7 - Desativação da interface WAN temporária
 # O que faz: Desliga a interface WAN temporária após a instalação para segurança.
 
 sudo nmcli device disconnect "$INTERFACE_WAN_TEMP"
 
-# 7 - Configurar DNS da interface LAN para localhost
+# 8 - Configurar DNS da interface LAN para localhost
 # O que faz: Define o servidor DNS da interface LAN para o próprio servidor (localhost).
 
 # O que faz o ipv4.dns: Define o servidor DNS que a interface irá usar.
@@ -174,7 +174,7 @@ echo "Limpeza de rede concluída."
 sleep 0.5
 echo ""
 
-# 8 - Extrair octetos do IP para criar zona reversa
+# 9 - Extrair octetos do IP para criar zona reversa
 # O que faz: Divide o endereço IP em 4 partes (octetos) para poder criar a zona de resolução inversa.
 
 # O que é zona reversa: Permite descobrir o nome de domínio a partir de um endereço IP (IP → nome).
@@ -206,7 +206,7 @@ echo "Serial Date: $SERIAL_DATE"
 sleep 1
 echo ""
 
-# 9 - Criar ficheiro de zona direta (Forward Zone)
+# 10 - Criar ficheiro de zona direta (Forward Zone)
 # O que faz: Cria o ficheiro que resolve nomes de domínio para endereços IP (nome → IP).
 # O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
 # O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
@@ -240,7 +240,7 @@ EOF
 echo "Zona direta criada: /var/named/${DOMINIO}.db"
 sleep 0.5
 
-# 10 - Criar ficheiro de zona inversa (Reverse Zone)
+# 11 - Criar ficheiro de zona inversa (Reverse Zone)
 # O que faz: Cria o ficheiro que resolve endereços IP para nomes de domínio (IP -> nome).
 
 echo "A criar zona inversa (Reverse Zone)..."
@@ -265,10 +265,8 @@ echo "Zona inversa criada: /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db"
 sleep 0.5
 echo ""
 
-# ----------------------------------------------------
-# 11 - Configurar named.conf (ficheiro principal do BIND)
+# 12 - Configurar named.conf (ficheiro principal do BIND)
 # O que faz: Cria o ficheiro de configuração principal do servidor BIND com todas as opções necessárias.
-# ----------------------------------------------------
 
 echo ""
 echo "CONFIGURAÇÃO DO BIND"
@@ -334,14 +332,13 @@ EOF
 echo "Configuração básica do named.conf concluída."
 sleep 1
 
-# ----------------------------------------------------
-# 12 - Adicionar zonas personalizadas ao named.conf
+# 13 - Adicionar zonas personalizadas ao named.conf
 # O que faz: Adiciona as definições das zonas direta e inversa ao ficheiro de configuração.
-# ----------------------------------------------------
+
+# O que faz o -a: Anexa (append) conteúdo ao ficheiro sem sobrescrever o que já existe.
 
 echo "A adicionar zonas personalizadas ao named.conf..."
 
-# O que faz o -a: Anexa (append) conteúdo ao ficheiro sem sobrescrever o que já existe.
 sudo tee -a /etc/named.conf >/dev/null << EOF
 
 zone "${DOMINIO}" IN {
@@ -363,35 +360,33 @@ EOF
 # - allow-update { none; }: Não permite atualizações dinâmicas (mais seguro).
 
 echo "Zonas adicionadas com sucesso."
-sleep 1
+sleep 0.5
 
-# ----------------------------------------------------
-# 13 - Criar diretório para logs do BIND
+# 14 - Criar diretório para logs do BIND
 # O que faz: Cria a estrutura de diretórios para armazenar os logs de consultas DNS.
-# ----------------------------------------------------
+
+# O que faz o mkdir -p: Cria o diretório (e diretórios pais se não existirem).
 
 echo "A criar diretório de logs..."
 
-# O que faz o mkdir -p: Cria o diretório (e diretórios pais se não existirem).
 sudo mkdir -p /var/log/named
 
 # O que faz o chown: Change owner - muda o proprietário do diretório.
 # O que faz o named:named: Define o utilizador "named" e grupo "named" como proprietários.
-# Porquê: O serviço BIND corre com o utilizador "named", que precisa de escrever nos logs.
+# O que faz o chmod 755: Define permissões - dono pode ler/escrever/executar, outros podem ler/executar.
+
 sudo chown named:named /var/log/named
 
-# O que faz o chmod 755: Define permissões - dono pode ler/escrever/executar, outros podem ler/executar.
 sudo chmod 755 /var/log/named
 
 echo "Diretório de logs criado."
-sleep 1
+sleep 0.5
 echo ""
 
-# ----------------------------------------------------
-# 14 - Definir permissões dos ficheiros de zona
+# 15 - Definir permissões dos ficheiros de zona
 # O que faz: Altera o proprietário dos ficheiros de zona para o utilizador "named".
-# Porquê: O BIND precisa de ter acesso de leitura a estes ficheiros para funcionar.
-# ----------------------------------------------------
+
+# O que faz o sudo chown: Change owner - muda o proprietário dos ficheiros de zona para o utilizador e grupo "named".
 
 echo "A definir permissões dos ficheiros de zona..."
 
@@ -402,11 +397,12 @@ echo "Permissões definidas."
 sleep 1
 echo ""
 
-# ----------------------------------------------------
-# 15 - Validar configuração do BIND (named.conf)
+# 16 - Validar configuração do BIND (named.conf)
 # O que faz: Verifica se o ficheiro de configuração principal tem erros de sintaxe.
-# Porquê: Evita que o BIND falhe ao arrancar devido a erros de configuração.
-# ----------------------------------------------------
+
+# O que faz o named-checkconf: Ferramenta que valida a sintaxe do ficheiro named.conf.
+# O que faz o if ... then ... else: Estrutura condicional baseada no sucesso/falha do comando.
+# O que faz o exit 1: Sai do script com código de erro 1 em caso de falha. Juntamente com o set -e no início, isso interrompe o script.
 
 echo ""
 echo "=========================================="
@@ -416,8 +412,6 @@ echo ""
 
 echo "A validar named.conf..."
 
-# O que faz o named-checkconf: Ferramenta que valida a sintaxe do ficheiro named.conf.
-# O que faz o if ... then ... else: Estrutura condicional baseada no sucesso/falha do comando.
 if sudo named-checkconf; then
     echo "named.conf está OK!"
 else
@@ -425,31 +419,35 @@ else
     exit 1
 fi
 
-sleep 1
+sleep 0.5
 
-# ----------------------------------------------------
-# 16 - Validar zona direta
+# 17 - Validar zona direta
 # O que faz: Verifica se o ficheiro de zona direta tem erros de sintaxe ou inconsistências.
-# ----------------------------------------------------
-
-echo "A validar zona direta..."
 
 # O que faz o named-checkzone: Ferramenta que valida a sintaxe e integridade de ficheiros de zona.
+# O que faz o ${DOMINIO}: Nome da zona direta a validar.
+# O que faz o /var/named/${DOMINIO}.db: Caminho para o ficheiro de zona direta.
+# O que faz o if ... then ... else: Estrutura condicional baseada no sucesso/falha do comando.
+
+echo "A validar forward zone..."
+
 if sudo named-checkzone ${DOMINIO} /var/named/${DOMINIO}.db; then
     echo "Zona direta está OK!"
 else
-    echo "ERRO na zona direta! Verifique o ficheiro."
+    echo "ERRO na forward zone! Verifique o ficheiro."
     exit 1
 fi
 
 sleep 1
 
-# ----------------------------------------------------
-# 17 - Validar zona inversa
+# 18 - Validar zona inversa
 # O que faz: Verifica se o ficheiro de zona inversa tem erros de sintaxe ou inconsistências.
-# ----------------------------------------------------
 
-echo "A validar zona inversa..."
+# O que faz o ${REVERSE_ZONE_ID}: Nome da zona inversa a validar.
+# O que faz o /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db: Caminho para o ficheiro de zona inversa.
+# O que faz o if ... then ... else: Estrutura condicional baseada no sucesso/falha do comando.
+
+echo "A validar reverse zone..."
 
 if sudo named-checkzone ${REVERSE_ZONE_ID} /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db; then
     echo "Zona inversa está OK!"
@@ -458,14 +456,16 @@ else
     exit 1
 fi
 
-sleep 1
+sleep 0.5
 echo ""
 
-# ----------------------------------------------------
-# 18 - Configurar firewall
+# 19 - Configurar firewall
 # O que faz: Adiciona regras à firewall para permitir tráfego DNS (porta 53 TCP/UDP).
-# Porquê: Sem esta regra, os clientes não conseguem fazer consultas DNS ao servidor.
-# ----------------------------------------------------
+
+# O que faz o firewall-cmd: Ferramenta de gestão da firewall (firewalld) no CentOS/RHEL.
+# O que faz o --permanent: Torna a regra permanente (persiste após reboot).
+# O que faz o --add-service=dns: Permite tráfego para o serviço DNS (porta 53 TCP e UDP).
+# O que faz o --reload: Recarrega as regras da firewall para aplicar as mudanças imediatamente.
 
 echo ""
 echo "=========================================="
@@ -475,22 +475,20 @@ echo ""
 
 echo "A configurar firewall..."
 
-# O que faz o firewall-cmd: Ferramenta de gestão da firewall (firewalld) no CentOS/RHEL.
-# O que faz o --permanent: Torna a regra permanente (persiste após reboot).
-# O que faz o --add-service=dns: Permite tráfego para o serviço DNS (porta 53 TCP e UDP).
 sudo firewall-cmd --permanent --add-service=dns
 
-# O que faz o --reload: Recarrega as regras da firewall para aplicar as mudanças imediatamente.
 sudo firewall-cmd --reload
 
 echo "Firewall configurada com sucesso!"
-sleep 1
+sleep 0.5
 echo ""
 
-# ----------------------------------------------------
-# 19 - Iniciar e habilitar o serviço BIND
+# 20 - Iniciar e habilitar o serviço BIND
 # O que faz: Inicia o servidor DNS BIND e configura-o para arrancar automaticamente no boot.
-# ----------------------------------------------------
+
+# O que faz o systemctl enable --now: Habilita o serviço (auto-start) e inicia-o imediatamente.
+# O que faz o named: Nome do serviço BIND no systemd.
+# O que faz o systemctl status: Mostra o estado atual do serviço (ativo, inativo, erros).
 
 echo ""
 echo "INICIALIZAÇÃO DO SERVIÇO"
@@ -498,33 +496,29 @@ echo ""
 
 echo "A iniciar serviço BIND..."
 
-# O que faz o systemctl enable --now: Habilita o serviço (auto-start) e inicia-o imediatamente.
-# O que faz o named: Nome do serviço BIND no systemd.
 sudo systemctl enable --now named
 
-sleep 1
+sleep 0.5
 
-# O que faz o systemctl status: Mostra o estado atual do serviço (ativo, inativo, erros).
 sudo systemctl status named
 
 echo ""
 echo "DNS CONFIGURADO COM SUCESSO!"
 echo ""
-sleep 1
+sleep 0.5
 
-# ----------------------------------------------------
 # 21 - Menu de gestão de registos DNS
 # O que faz: Permite adicionar ou consultar registos DNS após a instalação inicial.
-# ----------------------------------------------------
 
 echo ""
-echo "Deseja adicionar ou consultar registos no DNS? (s/n): "
+echo "Deseja adicionar ou consultar registos no DNS? (y/n): "
 read -p "Resposta: " GERIR_REGISTOS
 
-if [[ "$GERIR_REGISTOS" == "s" || "$GERIR_REGISTOS" == "S" ]]; then
+if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
     
     # Loop do menu principal
     # O que faz: Mantém o menu ativo até o utilizador escolher sair.
+    
     while true; do
         echo ""
         echo "=========================================="
@@ -541,10 +535,8 @@ if [[ "$GERIR_REGISTOS" == "s" || "$GERIR_REGISTOS" == "S" ]]; then
         
         case $OPCAO_GESTAO in
             1)
-                # ----------------------------------------------------
                 # Adicionar registo à zona direta (A Record)
                 # O que faz: Adiciona um novo nome de host que aponta para um IP.
-                # ----------------------------------------------------
                 
                 echo ""
                 echo "--- Adicionar Nome para IP (zona direta) ---"
@@ -554,14 +546,15 @@ if [[ "$GERIR_REGISTOS" == "s" || "$GERIR_REGISTOS" == "S" ]]; then
                 
                 # Validar se o IP está na mesma rede
                 # O que faz: Extrai os primeiros 3 octetos do IP fornecido e compara com o IP do servidor.
+
                 IP_REDE_HOST=$(echo "$IP_HOST" | cut -d'.' -f1-3)
                 IP_REDE_SERVIDOR=$(echo "$IP_SERVIDOR_DNS" | cut -d'.' -f1-3)
                 
                 if [[ "$IP_REDE_HOST" != "$IP_REDE_SERVIDOR" ]]; then
                     echo ""
                     echo "AVISO: O IP $IP_HOST não está na mesma rede que o servidor ($IP_REDE_SERVIDOR.0/24)!"
-                    read -p "Deseja continuar mesmo assim? (s/n): " CONTINUAR
-                    if [[ "$CONTINUAR" != "s" && "$CONTINUAR" != "S" ]]; then
+                    read -p "Deseja continuar mesmo assim? (y/n): " CONTINUAR
+                    if [[ "$CONTINUAR" != "y" && "$CONTINUAR" != "Y" ]]; then
                         echo "Operação cancelada."
                         continue
                     fi
