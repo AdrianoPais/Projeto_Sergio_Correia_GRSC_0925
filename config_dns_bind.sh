@@ -48,15 +48,13 @@ echo "Informações recolhidas com sucesso!"
 sleep 0.5
 
 # 3 - Configuração da interface LAN com IP estático
-# O que faz: Define o endereço IP fixo do servidor DNS na interface de rede local.
+# O que faz: Configura a interface LAN principal com o IP estático fornecido.
 
 echo ""
 echo "=========================================="
 echo "   CONFIGURAÇÃO DE REDE"
 echo "=========================================="
 echo ""
-
-# O que faz: Cria uma nova conexão para a interface WAN temporária (se não existir).
 
 # O que faz o nmcli connection add: Adiciona uma nova conexão de rede.
 # O que faz o type ethernet: Define o tipo de conexão como Ethernet (cabo).
@@ -342,7 +340,7 @@ EOF
 # - logging: Configuração de logs para registar todas as consultas DNS.
 
 echo "Configuração básica do named.conf concluída."
-sleep 1
+sleep 0.5
 
 # 13 - Adicionar zonas personalizadas ao named.conf
 # O que faz: Adiciona as definições das zonas direta e inversa ao ficheiro de configuração.
@@ -503,10 +501,16 @@ echo ""
 # O que faz o systemctl status: Mostra o estado atual do serviço (ativo, inativo, erros).
 
 echo ""
-echo "INICIALIZAÇÃO DO SERVIÇO"
+echo "=========================================="
+echo "   INICIALIZAÇÃO DO SERVIÇO BIND"
+echo "=========================================="
 echo ""
 
-echo "A iniciar serviço BIND..."
+echo -n "A iniciar o Serviço BIND..."
+for i in {1..50}; do
+    printf "\rA carregar: [%-50s]" "$(printf '#%.0s' $(seq 1 $i))"
+    sleep 0.1
+done
 
 sudo systemctl enable --now named
 
@@ -521,6 +525,19 @@ sleep 0.5
 
 # 21 - Menu de gestão de registos DNS
 # O que faz: Permite adicionar ou consultar registos DNS após a instalação inicial.
+
+# O que faz o while true; do ... done: Cria um loop infinito para o menu.
+# O que faz o case ... in ... esac: Estrutura de seleção múltipla para escolher ações baseadas na opção do utilizador.
+# O que faz o read -p: Lê a entrada do utilizador com um prompt personalizado.
+# O que faz o sudo tee -a: Anexa (append) conteúdo ao ficheiro com privilégios de superutilizador.
+# O que faz o rndc reload: Recarrega as zonas DNS sem reiniciar o serviço BIND.
+# O que faz o sleep 0.5: Pausa a execução por 0.5 segundos para melhor legibilidade.
+# O que faz o sed -i '$ d': Remove a última linha do ficheiro (em caso de erro).
+# O que faz o $: Representa a última linha do ficheiro.
+# O que faz o d: Comando do sed para deletar a linha selecionada.
+# O que faz o exit 0: Sai do script com código de sucesso (0).
+# O que faz o continue: Retorna ao início do loop, permitindo nova escolha no menu.
+# O que faz o break: Sai do loop, terminando o menu.
 
 echo ""
 echo "Deseja adicionar ou consultar registos no DNS? (y/n): "
