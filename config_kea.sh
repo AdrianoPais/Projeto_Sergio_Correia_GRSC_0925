@@ -1,13 +1,7 @@
 #!/bin/bash
-dos2unix config_keaV4.sh
-
-# Instalar e executar dos2unix para corrigir possíveis problemas de quebra de linha
-sudo dnf install -y dos2unix
-
-# Devido a limitações de conhecimento, este programa vai operar unicamente sobre um CIDR /24. Esperamos, no futuro, alargar a escolha.
-
+# ========================================================================================= #
 #
-# =========================================================================================#
+# Devido a limitações de conhecimento, este programa vai operar unicamente sobre um CIDR /24. Esperamos, no futuro, alargar a escolha.
 #
 # Projeto: Automatização da Configuração de um Servidor DHCP (KEA) (Classe C)
 # Autor: Sérgio Correia
@@ -21,24 +15,32 @@ sudo dnf install -y dos2unix
 # O objetivo é fornecer uma solução robusta e de fácil utilização para administradores
 # de sistema.
 #
-# =========================================================================================#
+# ========================================================================================= #
 #
+
+# O que faz o dos2unix *.sh: Converte todos os ficheiros de script shell (.sh) no diretório atual do formato DOS/Windows para o formato Unix/Linux.
+
+dos2unix *.sh
 
 # 1 - Instalação do Service
 # O que faz: Instala o servidor DHCP KEA usando o gestor de pacotes DNF. Ao contrário de DHCP tradicional (dhcpd), o KEA vai usar o dnf para instalação.
+
 # O que faz o -y: Responde "sim" automaticamente a todas as perguntas durante a instalação, permitindo que o processo seja não interativo.
-
-# O que difere de DHCP tradicional (dhcpd): O KEA DHCP4 é uma alternativa moderna ao dhcpd, instalado em CentOS 10 como norma.
-
 # O que faz o set -e: Configura o script para sair imediatamente se qualquer comando retornar um código de erro diferente de zero, garantindo que erros são tratados imediatamente.
 
 set -e
 
 # O que faz o chmod 775: Define as permissões do ficheiro para que o proprietário e o grupo possam ler, escrever e executar, enquanto outros utilizadores podem ler e executar.
 
-chmod 775 config_keaV4.sh
+chmod 775 config_kea.sh
 
 # O que faz o dnf install -y kea: Instala o pacote KEA DHCP4 usando o gestor de pacotes DNF com a opção -y para automatizar a instalação.
+
+echo ""
+echo "=========================================="
+echo "   INSTALAÇÃO: KEA (DHCP4) "
+echo "=========================================="
+echo ""
 
 sudo dnf install -y kea
 
@@ -105,8 +107,6 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
 
     read -p "Qual vai ser o início do range DHCP (4º octeto)? " OCTETO_INICIO_RANGE
     read -p "Qual vai ser o fim do range DHCP (4º octeto)? " OCTETO_FIM_RANGE
-    read -p "Inserir o 4º octeto do IP de Gateway (1 ou 254): " OCTETO_IP_GATEWAY
-    read -p "Inserir o IP de DNS (8.8.8.8 ou 1.1.1.1): " IP_DNS
     read -p "Inserir o nome do domínio (ex: empresa.local): " DOMAIN_NAME
     read -p "Inserir o IP do Servidor DNS BIND (o IP estático na LAN Segment): " IP_DNS_BIND
 
@@ -121,78 +121,72 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
 
     IP_RANGE_INICIO="${IP_SUBNET_SERVIDOR_C}.${OCTETO_INICIO_RANGE}"
     IP_RANGE_FIM="${IP_SUBNET_SERVIDOR_C}.${OCTETO_FIM_RANGE}"
-    IP_GATEWAY="${IP_SUBNET_SERVIDOR_C}.${OCTETO_IP_GATEWAY}"
     IP_REDE="${IP_SUBNET_SERVIDOR_C}.0"
 
     # 4.4 - Octetos individuais para validações
 	# O que faz: Extrai os octetos individuais do IP do servidor e do DNS para facilitar as validações subsequentes.
 
+    IP_DNS="${IP_DNS_BIND}"
     OCTETO_IP_DNS=$(echo "$IP_DNS" | cut -d'.' -f4)
 
-    # 4.5 - Validação do IP da Gateway
-	# O que faz: Verifica se o 4º octeto do IP da gateway é 1 ou 254, garantindo que a gateway está configurada corretamente.
-
-    if [[ "$OCTETO_IP_GATEWAY" != "1" && "$OCTETO_IP_GATEWAY" != "254" ]]; then
-        echo "Erro 4! O IP do Gateway só deve ser 1 ou 254."
-        continue
-    fi
-
-    # 4.6 - Cálculo do Broadcast
+    # 4.5 - Cálculo do Broadcast
 	# O que faz: Calcula o IP de broadcast com base no 4º octeto da gateway. Se a gateway for .1, o broadcast será .255, e vice-versa.
 
     IP_BROADCAST="${IP_SUBNET_SERVIDOR_C}.255"
 
-    # 4.7 - Validação do IP de DNS
-	# O que faz: Verifica se o IP de DNS é um dos endereços públicos comuns
-	# O que faz o !=: Operador de negação em bash, usado para verificar se uma condição não é verdadeira.
-	# O que faz o &&: Operador lógico "E" em bash, usado para combinar múltiplas condições.
-
-    if [[ "$IP_DNS" != "8.8.8.8" && "$IP_DNS" != "1.1.1.1" ]]; then
-        echo "Erro 5! O IP de DNS só pode ser 8.8.8.8 (Google) ou 1.1.1.1 (Cloudflare)."
-        continue
-    fi
-
-    # 4.8 - Validação do Range DHCP
+    # 4.6 - Validação do Range DHCP
     # O que faz: Garante que o início do range DHCP é menor que o fim e que o IP do servidor não está dentro do range DHCP.
     # O que faz o >=: Operador de comparação em bash, usado para verificar se um valor é maior ou igual a outro.
 
+    # Validação 1: Início do range deve ser menor que o fim
 
     if (( OCTETO_INICIO_RANGE >= OCTETO_FIM_RANGE )); then
-    echo "Erro 6! Início do range deve ser menor que o fim."
-    continue
+        echo "Erro 6! Início do range ($OCTETO_INICIO_RANGE) deve ser menor que o fim ($OCTETO_FIM_RANGE)."
+        continue
     fi
+
+    # Validação 2: IP do servidor não pode estar dentro do range DHCP.
 
     QUARTO_OCTETO_SERVIDOR=$(echo "$IP_SERVIDOR" | cut -d'.' -f4)
 
     if (( QUARTO_OCTETO_SERVIDOR >= OCTETO_INICIO_RANGE && QUARTO_OCTETO_SERVIDOR <= OCTETO_FIM_RANGE )); then
-        echo "Erro 7! O IP do Servidor não pode estar dentro do range DHCP."
+        echo "Erro 7! O 4º octeto do Servidor ($QUARTO_OCTETO_SERVIDOR) não pode estar dentro do range DHCP ($OCTETO_INICIO_RANGE - $OCTETO_FIM_RANGE)."
         continue
     fi
 
-    # 4.9 - Mostrar resumo para confirmação
-	# O que faz: Exibe um resumo dos IPs configurados para o utilizador revisar antes da confirmação final.
+    # Validação 3: IP do Gateway não pode estar dentro do range DHCP (Recomendação de segurança/padrão)
 
-	echo -n "[ "
+    if (( OCTETO_IP_GATEWAY >= OCTETO_INICIO_RANGE && OCTETO_IP_GATEWAY <= OCTETO_FIM_RANGE )); then
+        echo "Erro 8! O 4º octeto do Gateway ($OCTETO_IP_GATEWAY) não deve estar dentro do range DHCP."
+        continue
+    fi
 
-	for i in {1..40}; do
-		echo -n "="
-		sleep 0.2
-	done
+    # 4.7 - Mostrar resumo para confirmação
 
-	echo " ]"
+    echo -n "[ "
 
-    echo "Resumo dos IPs configurados:"
-    echo "IP Servidor: $IP_SERVIDOR"
-    echo "Range DHCP: $IP_RANGE_INICIO - $IP_RANGE_FIM"
-    echo "IP Gateway: $IP_GATEWAY"
-    echo "IP Broadcast: $IP_BROADCAST"
-    echo "IP de Rede: $IP_REDE"
-    echo "Domain Name: $DOMAIN_NAME"
+    for i in {1..40}; do
+        echo -n "="
+        sleep 0.05
+    done
 
+    echo " ]"
 
-    # 4.10 - Solicitar confirmação final
-	# O que faz: Pede ao utilizador para confirmar se os IPs estão corretos. Se a resposta for "y" ou "Y", o loop termina; caso contrário, o utilizador pode reinserir os valores.
-	# O que faz o read -p: Exibe uma mensagem para o utilizador antes de esperar pela entrada.
+    echo ""
+
+    echo "Resumo dos IPs configurados (Sub-rede: $IP_SUBNET_SERVIDOR_C):"
+    echo "---------------------------------------------------------"
+    echo "IP Servidor Estático: $IP_SERVIDOR (Fora do range DHCP)"
+    echo "IP Gateway/Router:    $IP_GATEWAY"
+    echo "IP DNS BIND:          $IP_DNS"
+    echo "Range DHCP (Início): $IP_RANGE_INICIO"
+    echo "Range DHCP (Fim):     $IP_RANGE_FIM"
+    echo "IP Broadcast:         $IP_BROADCAST"
+    echo "IP de Rede:           $IP_REDE"
+    echo "Domain Name:         $DOMAIN_NAME"
+    echo "---------------------------------------------------------"
+
+    # 4.8 - Solicitar confirmação final
 
     read -p "Validação básica concluída! Está tudo correto? (y/n): " VERIFICACAO
 
@@ -217,27 +211,67 @@ done
 echo " ]"
 echo "Feito!"
 
-# Pergunta ao utilizador se quer acesso à Internet
+# 5 - Configuração do Acesso à Internet
+# O que faz: Pergunta ao utilizador se os clientes DHCP devem ter acesso à Internet. Se sim, configura o gateway e os servidores DNS apropriados.
+
+# O que faz o ,,: Converte a entrada do utilizador para minúsculas, facilitando a comparação.
+# O que faz o ==: Operador de comparação em bash, usado para verificar se duas strings são iguais.
+# O que faz o if/else: Estrutura condicional que executa diferentes blocos de código com base na condição avaliada.
+# O que faz o read -p: Pede ao utilizador para inserir uma resposta, exibindo uma mensagem antes da entrada.
+# O que faz o &&: Operador lógico "E" em bash, usado para combinar múltiplas condições.
+# O que faz o ||: Operador lógico "OU" em bash, usado para executar um comando se o anterior falhar.
+
+# O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração do gateway e DNS é independente do serviço DHCP utilizado.
+
 read -p "Deseja que os clientes tenham acesso à Internet? (y/N): " ACESSO_INTERNET
 ACESSO_INTERNET=${ACESSO_INTERNET,,}
 
 if [ "$ACESSO_INTERNET" == "y" ]; then
     ACESSO=1
+    
+    # 5.1 - Definir o GATEWAY para a rede DHCP: É O PRÓPRIO SERVIDOR (DHCP/NAT)
+    # O que faz: Define o gateway para os clientes DHCP como o IP do servidor, assumindo que este atuará como gateway para a rede LAN.
+
     GATEWAY="$IP_SERVIDOR"
-    read -p "Insira o IP de DNS (Exemplo: 8.8.8.8 ou 1.1.1.1): " IP_DNS
-    if [[ "$IP_DNS" != "8.8.8.8" && "$IP_DNS" != "1.1.1.1" ]]; then
-        echo "Erro 5! Valor inválido. DNS ficará a 1.1.1.1 por omissão."
-        IP_DNS="1.1.1.1"
+    
+    # 5.2 - Configurar o DNS do Servidor/Gateway (para ele ter acesso à Internet)
+    # O que faz: Pede ao utilizador para inserir o IP de um servidor DNS externo (Google ou Cloudflare) para que o servidor/gateway possa resolver nomes de domínio na Internet.
+
+    read -p "Insira o IP de DNS EXTERNO para o Servidor/Gateway (Ex: 8.8.8.8 ou 1.1.1.1): " IP_DNS_EXTERNO
+    
+    # 5.3 - Validação do DNS Externo
+    # O que faz: Verifica se o IP inserido é um dos servidores DNS públicos válidos (Google ou Cloudflare).
+
+    if [[ "$IP_DNS_EXTERNO" != "8.8.8.8" && "$IP_DNS_EXTERNO" != "1.1.1.1" ]]; then
+        echo "Aviso! Valor inválido para DNS Externo. O Servidor/Gateway usará 1.1.1.1 por omissão."
+        IP_DNS_EXTERNO="1.1.1.1"
     fi
+    
+    # 5.4 - Configurar o DNS Primário para os CLIENTES DHCP (Este é o seu Servidor BIND na LAN)
+    # O que faz: Pede ao utilizador para inserir o IP do servidor BIND/DNS na LAN, que será usado como DNS primário pelos clientes DHCP.
+
+    read -p "Insira o IP do seu Servidor BIND/DNS na LAN Segment (Será o DNS Primário dos clientes): " IP_DNS_BIND_PRIMARIO
+    
+    IP_DNS="$IP_DNS_BIND_PRIMARIO"
+    
     echo "Acesso à Internet ativado."
+    echo "Clientes DHCP receberão: Gateway ($GATEWAY) e DNS ($IP_DNS)."
+
 else
+    # 5.5 - Configuração para Operar sem Acesso à Internet
+    # O que faz: Configura o servidor DHCP para operar sem acesso à Internet, apenas com DNS local (BIND).
+
     ACESSO=0
     GATEWAY=""
-    IP_DNS=""
-    echo "Apenas atribuição de IP, sem acesso à Internet."
+    IP_DNS_EXTERNO=""
+
+    read -p "Insira o IP do seu Servidor BIND/DNS na LAN Segment (Será o único DNS para os clientes): " IP_DNS_BIND_PRIMARIO
+
+    IP_DNS="$IP_DNS_BIND_PRIMARIO"
+    echo "Apenas atribuição de IP local. Clientes DHCP receberão DNS ($IP_DNS)."
 fi
 
-# 5 - Deteção e Configuração da Placa de Rede
+# 6 - Deteção e Configuração da Placa de Rede
 # O que faz: Deteta automaticamente a interface de rede ativa e pede confirmação ao utilizador.
 
 # O que faz o nmcli -t -f DEVICE connection show --active: Usa o NetworkManager Command Line Interface (nmcli) para listar as conexões de rede ativas e extrair apenas os nomes dos dispositivos (interfaces de rede).
@@ -253,11 +287,6 @@ fi
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da interface de rede é independente do serviço DHCP utilizado.
 
-# 5 - Deteção e Configuração das Placas de Rede
-# Agora o script vai configurar DUAS interfaces:
-#  - Uma (WAN) que recebe Internet via NAT (DHCP)
-#  - Outra (LAN) com IP fixo para o DHCP KEA
-
 echo ""
 echo "=== Configuração de Interfaces ==="
 echo ""
@@ -269,78 +298,101 @@ read -p "Qual é a interface LAN (para DHCP)? " LAN_IF
 
 echo ""
 echo "A configurar interface WAN ($WAN_IF) para obter IP por DHCP..."
-sleep 1
+sleep 0.5
+
 sudo nmcli connection add type ethernet ifname "$WAN_IF" con-name WAN ipv4.method auto || true
 sudo nmcli connection up WAN || sudo nmcli connection up "$WAN_IF"
 
-# Mostrar IP obtido pela WAN
+# 6.1 - Mostrar IP obtido pela WAN
+# O que faz: Exibe o endereço IP obtido pela interface WAN após a configuração DHCP.
+
 WAN_IP=$(ip -4 addr show "$WAN_IF" | grep inet | awk '{print $2}' | head -n1)
 echo "Interface WAN configurada com IP: ${WAN_IP:-"A aguardar DHCP..."}"
 
-# Configurar LAN com IP do utilizador (já definido anteriormente)
+# 6.2 - Configurar LAN com IP do utilizador (já definido anteriormente)
+# O que faz: Configura a interface LAN com o IP estático fornecido pelo utilizador, juntamente com o gateway e o servidor DNS.
+
 echo ""
 echo "A configurar interface LAN ($LAN_IF) com IP $IP_SERVIDOR/24..."
-sleep 1
+sleep 0.5
 sudo nmcli connection add type ethernet ifname "$LAN_IF" con-name LAN ipv4.method manual ipv4.addresses "$IP_SERVIDOR/24" || true
 sudo nmcli connection modify LAN ipv4.gateway "$IP_GATEWAY" ipv4.dns "$IP_DNS"
 sudo nmcli connection up LAN || sudo nmcli connection up "$LAN_IF"
 
 echo ""
 echo "Interfaces configuradas:"
-sleep 1
+sleep 0.5
 ip -4 addr show "$WAN_IF"
 ip -4 addr show "$LAN_IF"
 
-# 5.1 - Ativar IP Forwarding
+# 6.3 - Ativar IP Forwarding
 # O que faz: Ativa o encaminhamento de IP no sistema, permitindo que o tráfego de rede seja roteado entre diferentes interfaces.
+
 # O que faz o sysctl -w net.ipv4.ip_forward=1: Ativa o encaminhamento de IP temporariamente, até ao próximo reboot.
 # O que faz o tee -a /etc/sysctl.conf: Adiciona a configuração de encaminhamento de IP ao ficheiro sysctl.conf para que a alteração seja persistente após reboot.
 
 echo ""
 echo "Ativando IP forwarding..."
-sleep 1
+sleep 0.5
 sudo sysctl -w net.ipv4.ip_forward=1
 echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf > /dev/null
 
-# 5.2 - Configurar NAT (masquerading)
+# 6.4 - Configurar NAT (masquerading)
 # O que faz: Configura regras de NAT (Network Address Translation) usando iptables para permitir que os dispositivos na rede LAN acedam à Internet através da interface WAN.
+
 # O que faz o iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE: Adiciona uma regra à tabela NAT para mascarar os endereços IP de origem dos pacotes que saem pela interface WAN.
+# O que faz o iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -j ACCEPT: Permite o encaminhamento de pacotes da interface LAN para a interface WAN.
+# O que faz o iptables -A FORWARD -i "$WAN_IF" -o "$LAN_IF" -m state --state RELATED,ESTABLISHED -j ACCEPT: Permite o encaminhamento de pacotes da interface WAN para a interface LAN, mas apenas para conexões relacionadas ou estabelecidas.
+# O que faz o -t nat: Especifica que a regra será adicionada à tabela NAT do iptables.
+# O que faz o -A POSTROUTING: Adiciona uma regra à cadeia POSTROUTING, que é usada para modificar pacotes após a decisão de roteamento ter sido tomada.
+# O que faz o -j MASQUERADE: Especifica a ação a ser tomada para os pacotes correspondentes à regra, neste caso, mascarar o endereço IP de origem.
+# O que faz o -m state --state RELATED,ESTABLISHED: Usa o módulo de estado para corresponder apenas a pacotes que são parte de conexões já estabelecidas ou relacionadas.
+# O que faz o -A FORWARD: Adiciona uma regra à cadeia FORWARD, que é usada para controlar o encaminhamento de pacotes entre interfaces de rede.
+# O que faz o -i: Especifica a interface de entrada para a regra.
+# O que faz o -o: Especifica a interface de saída para a regra.
+# O que faz o ACCEPT: Especifica que os pacotes correspondentes à regra devem ser aceitos e encaminhados.
+# O que faz o sudo: Executa os comandos com privilégios de superutilizador, necessários para modificar as regras do iptables.
+# O que faz o sleep 0.5: Pausa a execução do script por meio segundo, proporcionando uma melhor experiência visual ao utilizador.
 
 echo ""
 echo "Aplicando regras de NAT..."
-sleep 1
+sleep 0.5
 sudo iptables -t nat -A POSTROUTING -o "$WAN_IF" -j MASQUERADE
 sudo iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -j ACCEPT
 sudo iptables -A FORWARD -i "$WAN_IF" -o "$LAN_IF" -m state --state RELATED,ESTABLISHED -j ACCEPT
 
-# Tornar as regras persistentes (para reboot)
+# 6.5 - Tornar as regras persistentes (para reboot)
 # O que faz: Instala o pacote iptables-services para permitir a persistência das regras de iptables após reboot.
+
+# O que faz o dnf install -y iptables-services: Instala o pacote iptables-services usando o gestor de pacotes DNF com a opção -y para automatizar a instalação.
+# O que faz o service iptables save: Salva as regras atuais do iptables para que sejam restauradas automaticamente na reinicialização do sistema.
+# O que faz o systemctl enable iptables: Habilita o serviço iptables para iniciar automaticamente na inicialização do sistema.
 
 echo ""
 echo "A guardar as regras de NAT para persistirem após reboot."
-sleep 1
+sleep 0.5
 sudo dnf install -y iptables-services
 sudo service iptables save
 sudo systemctl enable iptables
 
-# 5.3 - Firewall
+# 6.6 - Firewall
 # O que faz: Configura a firewall (firewalld) para permitir o serviço DHCP e ativar o masquerading, garantindo que os clientes possam comunicar com o servidor e aceder à Internet.
 # O que é o masquerade: Técnica de NAT que permite que múltiplos dispositivos numa rede local acedam à Internet usando um único endereço IP público.
 
 echo ""
 echo "A configurar os acessos à firewall..."
-sleep 1
+sleep 0.5
 sudo firewall-cmd --permanent --add-service=dhcp
 sudo firewall-cmd --permanent --add-masquerade
 sudo firewall-cmd --reload
 
 echo ""
 echo "Interfaces e NAT configurados com sucesso!"
-sleep 1
+sleep 0.5
 echo "WAN ($WAN_IF) -> Internet via NAT"
 echo "LAN ($LAN_IF) -> IP fixo $IP_SERVIDOR/24 + DHCP KEA"
 
-# 6 - Edição do Config do DHCP (Kea)
+# 7 - Edição do Config do DHCP (Kea)
 # O que faz: Escreve o ficheiro de configuração JSON do Kea DHCPv4 com os parâmetros fornecidos.
 # O que faz o sudo tee: Permite escrever múltiplas linhas de texto em ficheiros que requerem privilégios de superutilizador.
 # O que faz o >/dev/null: Redireciona a saída padrão para /dev/null, suprimindo a saída do comando no terminal.
@@ -498,10 +550,10 @@ echo "A validar as configurações do Kea DHCP4..."
 if ! sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf; then
     echo "Erro: Configuração inválida detetada. Por favor, reveja o ficheiro de configuração."
     exit 1
-    sleep 2
+    sleep 0.5
 fi
 
-# 7 - Add o Service à firewall
+# 8 - Add o Service à firewall
 # O que faz: Configura a firewall (firewalld) para permitir o serviço DHCP (kea/dhcp), garantindo que os clientes podem comunicar com o servidor.
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da firewall é independente do serviço DHCP utilizado.
@@ -518,7 +570,7 @@ sudo systemctl restart firewalld
 echo "Serviço firewalld reiniciado."
 sleep 0.5
 
-# 8 - Restart dos Services
+# 9 - Restart dos Services
 # O que faz: Inicia o serviço do servidor DHCP (dhcpd) e garante que ele arranca automaticamente no boot. O sudo journalctl é usado para mostrar os logs do serviço, confirmando que o DHCP está ativo e a funcionar.
 # O que faz o -t do kea-dhcp4: Testa a configuração do Kea DHCPv4 antes de iniciar o serviço, garantindo que não há erros no ficheiro de configuração.
 
@@ -536,17 +588,9 @@ sudo systemctl restart kea-dhcp4
 echo "Serviço Kea DHCP4 reiniciado."
 sleep 0.5
 
-#echo "Journal, para mostrar que os logs estão active."
-#sudo journalctl -u dhcpd -f
-
 echo "Recomenda-se um reboot do sistema para garantir que todas as alterações tenham efeito."
 echo "Para reiniciar o sistema, execute: reboot"
 sleep 0.5
-
-# 9 - Listar comandos disponíveis no Kea Shell (opcional)
-# O que faz: Lista os comandos disponíveis no Kea Shell, uma ferramenta de linha de comandos para interagir com o servidor DHCP KEA.
-
-#sudo kea-shell --host 127.0.0.1 --port 8000 list-commands
 
 # 10 - Configuração final
 # O que faz: Oferece ao utilizador a opção de executar verificações finais, como verificar o status do serviço, listar os leases atribuídos e visualizar as últimas linhas do log.
@@ -608,7 +652,10 @@ while true; do
 done
 
 echo ""
-echo "Comandos úteis para o futuro:"
+echo "=========================================="
+echo "   COMANDOS ÚTEIS PARA O FUTURO"
+echo "=========================================="
+echo ""
 echo "- Ver leases: cat /var/lib/kea/kea-leases4.csv"
 echo "- Ver logs: tail -f /var/log/kea-dhcp4.log"
 echo "- Status: systemctl status kea-dhcp4"
