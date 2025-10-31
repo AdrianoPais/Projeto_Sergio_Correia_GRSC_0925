@@ -11,6 +11,8 @@
 #
 # =========================================================================================#
 
+dos2unix config_dns_bind.sh
+
 set -e
 
 echo ""
@@ -21,12 +23,15 @@ echo ""
 
 # 1 - Definir permissões do script
 # O que faz: Garante que o script tem permissões corretas para ser executado.
+
 # O que faz o chmod 775: Define permissões de leitura, escrita e execução para o proprietário e grupo, e leitura e execução para outros.
 
 chmod 775 config_dns_bindV2.sh
 
 # 2 - Recolha de informações do utilizador
 # O que faz: Solicita ao utilizador os dados necessários para configurar o servidor DNS.
+
+# O que faz o read -p: Lê a entrada do utilizador com um prompt personalizado.
 
 echo ""
 read -p "Introduza o domínio (ex: empresa.local): " DOMINIO
@@ -40,7 +45,7 @@ sleep 0.5
 
 echo ""
 echo "Informações recolhidas com sucesso!"
-sleep 1
+sleep 0.5
 
 # 3 - Configuração da interface LAN com IP estático
 # O que faz: Define o endereço IP fixo do servidor DNS na interface de rede local.
@@ -52,6 +57,14 @@ echo "=========================================="
 echo ""
 
 # O que faz: Cria uma nova conexão para a interface WAN temporária (se não existir).
+
+# O que faz o nmcli connection add: Adiciona uma nova conexão de rede.
+# O que faz o type ethernet: Define o tipo de conexão como Ethernet (cabo).
+# O que faz o ifname: Especifica o nome da interface de rede física.
+# O que faz o con-name: Define um nome amigável para a conexão.
+# O que faz o sudo: Executa o comando com privilégios de superutilizador (root).
+# O que faz o $INTERFACE_WAN_TEMP: Variável que contém o nome da interface WAN temporária.
+# O que faz o $LAN_INTERFACE: Variável que contém o nome da interface LAN principal.
 
 sudo nmcli connection add type ethernet ifname "$INTERFACE_WAN_TEMP" con-name "$INTERFACE_WAN_TEMP"
 echo "A configurar IP estático $IP_SERVIDOR_DNS na interface $LAN_INTERFACE..."
@@ -124,7 +137,6 @@ echo ""
 # O que faz o nmcli con mod: Modifica a configuração da conexão de rede.
 # O que faz o ipv4.dns: Define o servidor DNS para a interface de rede.
 # O que faz o ens224: Nome da interface de rede principal (LAN).
-
 # O que é localhost: Endereço IP de loopback.
 
 echo ""
@@ -516,9 +528,9 @@ read -p "Resposta: " GERIR_REGISTOS
 
 if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
     
-    # Loop do menu principal
+    # 21.1 - Loop do menu principal
     # O que faz: Mantém o menu ativo até o utilizador escolher sair.
-    
+
     while true; do
         echo ""
         echo "=========================================="
@@ -535,7 +547,7 @@ if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
         
         case $OPCAO_GESTAO in
             1)
-                # Adicionar registo à zona direta (A Record)
+                # 21.1.1 - Adicionar registo à zona direta (A Record)
                 # O que faz: Adiciona um novo nome de host que aponta para um IP.
                 
                 echo ""
@@ -544,7 +556,7 @@ if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
                 read -p "Nome do host (ex: pc1, servidor, router): " NOME_HOST
                 read -p "Endereço IP (ex: 192.168.1.20): " IP_HOST
                 
-                # Validar se o IP está na mesma rede
+                # 21.1.2 - Validar se o IP está na mesma rede
                 # O que faz: Extrai os primeiros 3 octetos do IP fornecido e compara com o IP do servidor.
 
                 IP_REDE_HOST=$(echo "$IP_HOST" | cut -d'.' -f1-3)
@@ -560,44 +572,57 @@ if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
                     fi
                 fi
                 
-                # Incrementar o serial da zona
+                # 21.1.3 - Incrementar o serial da zona
                 # O que faz: Atualiza o número de série para que outros servidores DNS saibam que a zona mudou.
-                NOVO_SERIAL=$(date +%s)
-                
+
                 # O que faz o sed: Stream editor - ferramenta para procurar e substituir texto em ficheiros.
                 # O que faz o -i: Edita o ficheiro diretamente (in-place).
                 # O que faz o "s/ANTIGO/NOVO/": Substitui a primeira ocorrência de ANTIGO por NOVO.
+
+                NOVO_SERIAL=$(date +%s)
+
                 sudo sed -i "s/${SERIAL_DATE}/${NOVO_SERIAL}/" /var/named/${DOMINIO}.db
                 SERIAL_DATE=$NOVO_SERIAL
                 
-                # Adicionar o registo A ao ficheiro de zona
+                # 21.1.4 - Adicionar o registo A ao ficheiro de zona
                 # O que faz: Anexa uma nova linha ao ficheiro com o registo DNS tipo A.
+
                 echo "${NOME_HOST}  IN  A       ${IP_HOST}" | sudo tee -a /var/named/${DOMINIO}.db >/dev/null
                 
                 echo ""
                 echo "Registo adicionado com sucesso!"
                 echo "${NOME_HOST}.${DOMINIO} → ${IP_HOST}"
                 
-                # Validar a zona após alteração
+                # 21.1.5 - Validar a zona após alteração
+
+                # O que faz o rndc reload: Recarrega as zonas DNS sem reiniciar o serviço BIND.
+                # O que faz o if ... then ... else: Estrutura condicional baseada no sucesso/falha do comando.
+                # O que faz o sed -i '$ d': Remove a última linha do ficheiro (em caso de erro).
+                # O que faz o $: Representa a última linha do ficheiro.
+                # O que faz o d: Comando do sed para deletar a linha selecionada.
+                # O que faz o sleep 0.5: Pausa a execução por 1 segundo para melhor legibilidade.
+
                 if sudo named-checkzone ${DOMINIO} /var/named/${DOMINIO}.db >/dev/null 2>&1; then
-                    # O que faz o rndc reload: Recarrega as zonas DNS sem reiniciar o serviço BIND.
+
                     sudo rndc reload
                     echo "Zona recarregada com sucesso!"
+
                 else
+
                     echo "ERRO: Zona direta inválida após alteração!"
                     echo "A reverter alterações..."
+
                     # Remover a última linha adicionada em caso de erro
+
                     sudo sed -i '$ d' /var/named/${DOMINIO}.db
                 fi
                 
-                sleep 1
+                sleep 0.5
                 ;;
                 
             2)
-                # ----------------------------------------------------
-                # Adicionar registo à zona inversa (PTR Record)
+                # 21.1.6 - Adicionar registo à zona inversa (PTR Record)
                 # O que faz: Adiciona um registo que permite resolver IP para nome.
-                # ----------------------------------------------------
                 
                 echo ""
                 echo "--- Adicionar IP para Nome (zona inversa) ---"
@@ -605,52 +630,76 @@ if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
                 read -p "Último octeto do IP (ex: para 192.168.1.20, digite 20): " ULTIMO_OCTETO
                 read -p "Nome completo do host (ex: pc1.${DOMINIO}): " NOME_COMPLETO
                 
-                # Adicionar ponto final se não existir
+                # 21.1.6 - Adição do ponto final caso não exista.
                 # O que faz: Garante que o FQDN (Fully Qualified Domain Name) termina com ponto.
-                # Porquê: No DNS, um ponto final indica um nome absoluto.
+
+                # O que faz o =~ \.$: Verifica se a string termina com um ponto.
+                # O que faz o ${NOME_COMPLETO}.: Adiciona um ponto ao final do nome se necessário.
+
                 if [[ ! "$NOME_COMPLETO" =~ \.$ ]]; then
                     NOME_COMPLETO="${NOME_COMPLETO}."
                 fi
                 
-                # Incrementar o serial da zona inversa
+                # 21.1.7 - Incrementação da serial da zona inversa (reverse zone)
+                # O que faz: Atualiza o número de série para que outros servidores DNS saibam que a zona mudou.
+
+                # O que faz o sed: Stream editor - ferramenta para procurar e substituir texto em ficheiros.
+                # O que faz o -i: Edita o ficheiro diretamente (in-place).
+                # O que faz o "s/ANTIGO/NOVO/": Substitui a primeira ocorrência de ANTIGO por NOVO.
+                # O que faz o date +%s: Gera um número de série baseado no timestamp Unix (segundos desde 1 janeiro 1970).
+
                 NOVO_SERIAL=$(date +%s)
                 sudo sed -i "s/${SERIAL_DATE}/${NOVO_SERIAL}/" /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
                 SERIAL_DATE=$NOVO_SERIAL
                 
-                # Adicionar o registo PTR ao ficheiro de zona inversa
+                # 21.1.8 - Adicionar o registo PTR ao ficheiro de zona inversa
+
                 echo "${ULTIMO_OCTETO}  IN  PTR   ${NOME_COMPLETO}" | sudo tee -a /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null
                 
                 echo ""
                 echo "Registo inverso adicionado com sucesso!"
                 echo "  ${OCTETO_1}.${OCTETO_2}.${OCTETO_3}.${ULTIMO_OCTETO} → ${NOME_COMPLETO}"
                 
-                # Validar a zona inversa após alteração
+                # 21.1.9 - Validar a zona inversa após alteração
+                # O que faz: Verifica se o ficheiro de zona inversa está correto após a adição do novo registo.
+
+                # O que faz o rndc reload: Recarrega as zonas DNS sem reiniciar o serviço BIND.
+                # O que faz o if ... then ... else: Estrutura condicional baseada no sucesso/falha do comando.
+                # O que faz o sed -i '$ d': Remove a última linha do ficheiro (em caso de erro).
+                # O que faz o $: Representa a última linha do ficheiro.
+                # O que faz o d: Comando do sed para deletar a linha selecionada.
+                # O que faz o sleep 0.5: Pausa a execução por meio segundo para melhor legibilidade.
+
                 if sudo named-checkzone ${REVERSE_ZONE_ID} /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null 2>&1; then
                     sudo rndc reload
                     echo "Zona inversa recarregada com sucesso!"
+
                 else
                     echo "ERRO: Zona inversa inválida após alteração!"
                     echo "  A reverter alterações..."
                     sudo sed -i '$ d' /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
                 fi
                 
-                sleep 1
+                sleep 0.5
                 ;;
                 
             3)
-                # ----------------------------------------------------
-                # Ver registos existentes
+                # 21.1.10 - Ver registos existentes
                 # O que faz: Mostra os registos DNS atualmente configurados nas zonas.
-                # ----------------------------------------------------
                 
+                # O que faz o grep -v "^;": Filtra linhas que começam com ; (comentários).
+                # O que faz o grep -v "^$": Filtra linhas vazias.
+                # O que faz o grep -E "IN\s+(A|NS|CNAME|MX)": Filtra registos A, NS, CNAME e MX.
+                # O que faz o grep "PTR": Filtra registos PTR na zona inversa.
+                # O que faz o sudo cat: Mostra o conteúdo dos ficheiros de zona com permissões elevadas.
+
                 echo ""
                 echo "=========================================="
                 echo "   REGISTOS EXISTENTES"
                 echo "=========================================="
                 echo ""
                 echo "--- Zona Direta (${DOMINIO}) ---"
-                # O que faz o grep -v "^;": Filtra linhas que começam com ; (comentários).
-                # O que faz o grep -v "^$": Filtra linhas vazias.
+
                 sudo cat /var/named/${DOMINIO}.db | grep -v "^;" | grep -v "^$" | grep -E "IN\s+(A|NS|CNAME|MX)"
                 
                 echo ""
@@ -670,69 +719,114 @@ if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
             *)
                 echo ""
                 echo "Opção inválida! Tente novamente."
-                sleep 1
+                sleep 0.5
                 ;;
         esac
     done
 fi
 
-# ----------------------------------------------------
 # 22 - Menu de verificações opcionais
 # O que faz: Oferece ao utilizador opções para testar o servidor DNS configurado.
-# ----------------------------------------------------
+
+# O que faz o while True; do ... done: Loop infinito que mantém o menu ativo até o utilizador decidir sair.
+# O que faz o read -p: Lê a entrada do utilizador com um prompt personalizado.
 
 echo ""
 echo "Deseja executar verificações finais? (y/n): "
 read -p "Resposta: " FAZER_VERIFICACOES
 
-if [[ "$FAZER_VERIFICACOES" == "y" || "$FAZER_VERIFICACOES" == "Y" ]]; then
-    echo ""
-    echo "1) Testar resolução direta (nome -> IP);"
-    echo "2) Testar resolução inversa (IP -> nome);"
-    echo "3) Ver status do serviço;"
-    echo "4) Testar conectividade Internet;"
-    echo "5) Sair."
-    echo ""
-    read -p "Escolha uma opção (1-5): " OPCAO_VERIFICACAO_DNS
+while True; do
 
-    # O que faz o case: Estrutura de controlo que compara uma variável com vários padrões e executa código correspondente.
-    case $OPCAO_VERIFICACAO_DNS in
-        1)
-            echo ""
-            echo "--- Teste de Resolução Direta ---"
-            # O que faz o dig: Ferramenta de query DNS que consulta registos DNS.
-            dig ${DOMINIO}
-            dig ns.${DOMINIO}
-            ;;
-        2)
-            echo ""
-            echo "--- Teste de Resolução Inversa ---"
-            # O que faz o -x: Opção do dig que realiza uma query de resolução inversa (IP para nome).
-            dig -x ${IP_SERVIDOR_DNS}
-            ;;
-        3)
-            echo ""
-            echo "--- Status do Serviço BIND ---"
-            sudo systemctl status named
-            ;;
-        4)
-            echo ""
-            echo "--- Teste de Conectividade Internet ---"
-            # O que faz: Testa se o forwarder 8.8.8.8 está a funcionar corretamente.
-            dig google.com
-            ;;
-        5)
-            echo ""
-            echo "A sair sem verificações."
-            ;;
-        *)
-            echo ""
-            echo "Opção inválida. A sair sem verificações."
-            ;;
-    esac
-fi
+    # 22.1 - Menu de verificações DNS
+    # O que faz: Apresenta várias opções de teste para o servidor DNS.
+
+    if [[ "$FAZER_VERIFICACOES" == "y" || "$FAZER_VERIFICACOES" == "Y" ]]; then
+        echo ""
+        echo "1) Testar resolução direta (nome -> IP);"
+        echo "2) Testar resolução inversa (IP -> nome);"
+        echo "3) Ver status do serviço;"
+        echo "4) Testar conectividade Internet;"
+        echo "5) Sair."
+        echo ""
+        read -p "Escolha uma opção (1-5): " OPCAO_VERIFICACAO_DNS
+
+        # 22.1.1 - Estrutura case para opções de verificação
+        # O que faz o case: Estrutura de controlo que compara uma variável com vários padrões e executa código correspondente.
+
+        # O que faz o dig: Ferramenta de query DNS que consulta registos DNS.
+        # O que faz o -x: Opção do dig que realiza uma query de resolução inversa (IP para nome).
+        # O que faz o systemctl status: Mostra o estado atual do serviço (ativo, inativo, erros).
+        # O que faz o google.com: Domínio usado para testar se o forwarder está a funcionar corretamente.
+        # O que faz o break: Sai do loop atual (neste caso, sai do menu de verificações).
+        # O que faz o *: Padrão "catch-all" que captura qualquer entrada não prevista.
+        # O que faz o echo: Exibe mensagens no terminal.
+        # O que faz o ;;: Termina cada bloco de código dentro do case.
+        # O que faz o esac: Finaliza a estrutura case (é "case" escrito ao contrário).
+
+        case $OPCAO_VERIFICACAO_DNS in
+            1)
+                echo ""
+                echo "--- Teste de Resolução Direta ---"
+
+                # 22.1.2 - Teste de resolução direta
+                # O que faz: Consulta o servidor DNS para resolver nomes de domínio para endereços IP.
+
+                # O que faz o dig: Ferramenta de query DNS que consulta registos DNS.
+
+                dig ${DOMINIO}
+                dig ns.${DOMINIO}
+                ;;
+            2)
+                echo ""
+                echo "--- Teste de Resolução Inversa ---"
+
+                # 22.1.3 - Teste de resolução inversa
+                # O que faz: Consulta o servidor DNS para resolver endereços IP para nomes de domínio.
+
+                # O que faz o -x: Opção do dig que realiza uma query de resolução inversa (IP para nome).
+
+                dig -x ${IP_SERVIDOR_DNS}
+                ;;
+            3)
+                echo ""
+                echo "--- Status do Serviço BIND ---"
+                sudo systemctl status named
+                ;;
+            4)
+                echo ""
+                echo "--- Teste de Conectividade Internet ---"
+
+                # 22.1.4 - Teste de conectividade à Internet via DNS
+                # O que faz: Testa se o forwarder 8.8.8.8 está a funcionar corretamente.
+
+                dig google.com
+                ;;
+            5)
+                echo ""
+                echo "A sair sem verificações."
+
+                # 22.1.5 - Sair do menu de verificações
+                # O que faz: Encerra o loop do menu de verificações.
+
+                break
+                ;;
+            *)
+                echo ""
+                echo "Opção inválida. A sair sem verificações."
+
+                # 22.1.6 - Opção inválida
+                # O que faz: Encerra o loop do menu de verificações em caso de entrada inválida.
+
+                break
+                ;;
+        esac
+    fi
+done
 
 # O que faz o esac: Finaliza a estrutura case (é "case" escrito ao contrário).
+
+# 23 - Mensagens finais e comandos úteis
+# O que faz: Exibe comandos úteis para o utilizador após a conclusão do script.
 
 echo ""
 echo "=========================================="
