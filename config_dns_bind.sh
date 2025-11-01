@@ -186,22 +186,6 @@ case $OPCAO_MENU in
         echo "Fail2Ban instalado com sucesso!"
         sleep 0.5
 
-        # 7.3 - Incluir o novo ficheiro de logging no named.conf (se ainda não estiver)
-        # O que faz: Garante que o named.conf inclui a configuração de logging necessária para o Fail2Ban.
-
-        # O que faz o grep -q: Verifica silenciosamente se uma string existe num ficheiro (sem produzir saída).
-        # O que faz o if ... then ... fi: Estrutura condicional para verificar se a inclusão já existe.
-        # O que faz o tee -a: Anexa (append) conteúdo ao ficheiro sem sobrescrever o que já existe.
-        # O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
-        # O que faz o include "/etc/named/fail2ban_logging.conf": Linha que inclui o ficheiro de logging no named.conf.
-        # O que faz o /etc/named.conf: Ficheiro principal de configuração do BIND.
-        # O que faz o exit 1: Sai do script com código de erro 1 em caso de falha. Juntamente com o set -e no início, isso interrompe o script.
-        # O que faz o sleep 0.5: Pausa a execução por 0.5 segundos para melhor legibilidade.
-
-        if ! grep -q "include \"/etc/named/fail2ban_logging.conf\"" /etc/named.conf; then
-            echo "include \"/etc/named/fail2ban_logging.conf\";" | sudo tee -a /etc/named.conf >/dev/null
-        fi
-
         # 7.4 - Criar Jail (Regra) para o BIND DNS
         # O que faz: Define os parâmetros de banimento para o serviço DNS.
 
@@ -286,6 +270,22 @@ EOF
         echo "IP Servidor DNS: $IP_SERVIDOR_DNS"
         echo "Zona Reversa: $REVERSE_ZONE_ID"
         echo "Serial Date: $SERIAL_DATE"
+        sleep 0.5
+        echo ""
+
+        echo "A criar diretório e ficheiros de logs..."
+
+        sudo mkdir -p /var/log/named
+        sudo chown named:named /var/log/named
+        sudo chmod 755 /var/log/named
+        sudo touch /var/log/named/bind_queries.log
+        sudo touch /var/log/named/security.log
+        sudo chown named:named /var/log/named/bind_queries.log
+        sudo chown named:named /var/log/named/security.log
+        echo "Ajustando contexto SELinux para os logs do BIND..."
+        sudo restorecon -Rv /var/log/named
+
+        echo "Diretório e ficheiros de logs criados e permissões/SELinux ajustados."
         sleep 0.5
         echo ""
 
@@ -445,25 +445,6 @@ EOF
 
         echo "Zonas adicionadas com sucesso."
         sleep 0.5
-
-        # 14 - Criar diretório e ficheiros de logs
-        # O que faz: Cria a estrutura de diretórios, define permissões POSIX e o contexto SELinux para os logs.
-
-        echo "A criar diretório e ficheiros de logs..."
-
-        sudo mkdir -p /var/log/named
-        sudo chown named:named /var/log/named
-        sudo chmod 755 /var/log/named
-        sudo touch /var/log/named/bind_queries.log
-        sudo touch /var/log/named/security.log
-        sudo chown named:named /var/log/named/bind_queries.log
-        sudo chown named:named /var/log/named/security.log
-        echo "Ajustando contexto SELinux para os logs do BIND..."
-        sudo restorecon -Rv /var/log/named
-
-        echo "Diretório e ficheiros de logs criados e permissões/SELinux ajustados."
-        sleep 0.5
-        echo ""
 
         # 15 - Definir permissões dos ficheiros de zona
         # O que faz: Altera o proprietário dos ficheiros de zona para o utilizador "named".
