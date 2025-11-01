@@ -754,6 +754,7 @@ EOF
 
         # 22 - Menu de verificações opcionais
         # O que faz: Oferece ao utilizador opções para testar o servidor DNS configurado.
+
         # O que faz o while True; do ... done: Loop infinito que mantém o menu ativo até o utilizador decidir sair.
         # O que faz o read -p: Lê a entrada do utilizador com um prompt personalizado.
 
@@ -777,6 +778,8 @@ EOF
                 read -p "Escolha uma opção (1-5): " OPCAO_VERIFICACAO_DNS
 
                 # 22.1.1 - Estrutura case para opções de verificação
+                # O que faz: Executa diferentes comandos de teste baseados na escolha do utilizador.
+
                 # O que faz o case: Estrutura de controlo que compara uma variável com vários padrões e executa código correspondente.
                 # O que faz o dig: Ferramenta de query DNS que consulta registos DNS.
                 # O que faz o -x: Opção do dig que realiza uma query de resolução inversa (IP para nome).
@@ -863,6 +866,8 @@ EOF
         ;;
 
 esac
+
+# O que faz o esac: Finaliza a estrutura case (é "case" escrito ao contrário).
 
 # 23 - Mensagens finais e comandos úteis
 # O que faz: Exibe comandos úteis para o utilizador após a conclusão do script.
