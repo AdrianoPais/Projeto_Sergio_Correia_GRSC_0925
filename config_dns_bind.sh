@@ -186,39 +186,6 @@ case $OPCAO_MENU in
         echo "Fail2Ban instalado com sucesso!"
         sleep 0.5
 
-        # 7.2 - Configurar Logs de Segurança no BIND (Essencial para o Fail2Ban)
-        # Garantimos que o BIND está a usar um ficheiro de log que o Fail2Ban pode ler.
-
-        echo "A configurar logging de segurança no named.conf para o Fail2Ban..."
-
-        # Este comando deve ANEXAR ou SUBSTITUIR a secção 'logging' no named.conf
-        # NOTA: O bloco abaixo garante que o logging necessário existe.
-
-        # O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
-        # O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
-        # O que faz o EOF: Delimitador para indicar o início e fim do conteúdo a ser escrito.
-        # O que faz o channel security_log: Define um canal de logging específico para eventos de segurança.
-        # O que faz o file "/var/log/named/security.log": Define o ficheiro onde os logs de segurança serão armazenados.
-        # O que faz o severity info: Define o nível de severidade dos logs a serem capturados.
-        # O que faz o print-time yes: Inclui timestamps nos logs para melhor rastreamento.
-        # O que faz o category security { security_log; };: Associa a categoria de segurança ao canal de logging definido.
-        # O que faz o category client { security_log; };: Regista eventos relacionados com clientes (ex: recusas de acesso).
-        # O que faz o category queries { default_log; };: Mantém o logging padrão para consultas DNS normais.
-        # O que faz o default_log: Canal de logging padrão já existente no named.conf.
-
-        sudo tee /etc/named/fail2ban_logging.conf >/dev/null << EOF
-logging {
-    channel security_log {
-        file "/var/log/named/security.log" versions 3 size 5m;
-        severity info;
-        print-time yes;
-    };
-    category security { security_log; };
-    category client { security_log; };
-    category queries { default_log; };
-};
-EOF
-
         # 7.3 - Incluir o novo ficheiro de logging no named.conf (se ainda não estiver)
         # O que faz: Garante que o named.conf inclui a configuração de logging necessária para o Fail2Ban.
 
@@ -418,7 +385,14 @@ logging {
         severity info;
         print-time yes;
     };
+    channel security_log {
+        file "/var/log/named/security.log" versions 3 size 5m;
+        severity info;
+        print-time yes;
+    };
     category queries { default_log; };
+    category security { security_log; };
+    category client { security_log; };
 };
 
 zone "." IN {
@@ -477,27 +451,13 @@ EOF
 
         echo "A criar diretório e ficheiros de logs..."
 
-        # 1. CRIAR O DIRETÓRIO
         sudo mkdir -p /var/log/named
-
-        # 2. DEFINIR PERMISSÕES POSIX (chown/chmod)
-        # O que faz o chown: Muda o proprietário do diretório para named:named.
         sudo chown named:named /var/log/named
-
-        # O que faz o chmod 755: Permissões básicas para o named
         sudo chmod 755 /var/log/named
-
-        # 3. CRIAR OS FICHEIROS DE LOG DENTRO DO DIRETÓRIO (CRUCIAL)
         sudo touch /var/log/named/bind_queries.log
         sudo touch /var/log/named/security.log
-
-        # 4. GARANTIR PERMISSÕES POSIX NOS FICHEIROS
         sudo chown named:named /var/log/named/bind_queries.log
         sudo chown named:named /var/log/named/security.log
-
-        # 5. AJUSTAR CONTEXTO SELINUX (CORREÇÃO DE "PERMISSION DENIED")
-        # O que faz o restorecon: Restaura o contexto de segurança SELinux padrão para o diretório de logs, 
-        # permitindo que o processo 'named' escreva nele. O -R torna a operação recursiva.
         echo "Ajustando contexto SELinux para os logs do BIND..."
         sudo restorecon -Rv /var/log/named
 
