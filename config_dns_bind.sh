@@ -472,24 +472,36 @@ EOF
         echo "Zonas adicionadas com sucesso."
         sleep 0.5
 
-        # 14 - Criar diretório para logs do BIND
-        # O que faz: Cria a estrutura de diretórios para armazenar os logs de consultas DNS.
-        
-        # O que faz o mkdir -p: Cria o diretório (e diretórios pais se não existirem).
+        # 14 - Criar diretório e ficheiros de logs
+        # O que faz: Cria a estrutura de diretórios, define permissões POSIX e o contexto SELinux para os logs.
 
-        echo "A criar diretório de logs..."
+        echo "A criar diretório e ficheiros de logs..."
 
+        # 1. CRIAR O DIRETÓRIO
         sudo mkdir -p /var/log/named
 
-        # O que faz o chown: Change owner - muda o proprietário do diretório.
-        # O que faz o named:named: Define o utilizador "named" e grupo "named" como proprietários.
-        # O que faz o chmod 755: Define permissões - dono pode ler/escrever/executar, outros podem ler/executar.
-
+        # 2. DEFINIR PERMISSÕES POSIX (chown/chmod)
+        # O que faz o chown: Muda o proprietário do diretório para named:named.
         sudo chown named:named /var/log/named
 
+        # O que faz o chmod 755: Permissões básicas para o named
         sudo chmod 755 /var/log/named
 
-        echo "Diretório de logs criado."
+        # 3. CRIAR OS FICHEIROS DE LOG DENTRO DO DIRETÓRIO (CRUCIAL)
+        sudo touch /var/log/named/bind_queries.log
+        sudo touch /var/log/named/security.log
+
+        # 4. GARANTIR PERMISSÕES POSIX NOS FICHEIROS
+        sudo chown named:named /var/log/named/bind_queries.log
+        sudo chown named:named /var/log/named/security.log
+
+        # 5. AJUSTAR CONTEXTO SELINUX (CORREÇÃO DE "PERMISSION DENIED")
+        # O que faz o restorecon: Restaura o contexto de segurança SELinux padrão para o diretório de logs, 
+        # permitindo que o processo 'named' escreva nele. O -R torna a operação recursiva.
+        echo "Ajustando contexto SELinux para os logs do BIND..."
+        sudo restorecon -Rv /var/log/named
+
+        echo "Diretório e ficheiros de logs criados e permissões/SELinux ajustados."
         sleep 0.5
         echo ""
 
