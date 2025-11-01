@@ -36,12 +36,14 @@ case $OPCAO_MENU in
 
         # 1 - Definir permissões do script
         # O que faz: Garante que o script tem permissões corretas para ser executado.
+        
         # O que faz o chmod 775: Define permissões de leitura, escrita e execução para o proprietário e grupo, e leitura e execução para outros.
 
         chmod 775 config_dns_bind.sh
 
         # 2 - Recolha de informações do utilizador
         # O que faz: Solicita ao utilizador os dados necessários para configurar o servidor DNS.
+        
         # O que faz o read -p: Lê a entrada do utilizador com um prompt personalizado.
 
         echo ""
@@ -106,8 +108,10 @@ case $OPCAO_MENU in
 
         # 5 - Teste de conectividade à Internet
         # O que faz: Verifica se o servidor consegue aceder à Internet antes de instalar pacotes.
+        
         # O que faz o ping -c 3: Envia 3 pacotes ICMP para o servidor DNS público do Google (8.8.8.8).
         # O que faz o 8.8.8.8: Endereço IP do servidor DNS público do Google, usado para testar conectividade.
+        
         echo ""
         echo "Teste de conectividade antes da instalação."
 
@@ -139,8 +143,135 @@ case $OPCAO_MENU in
         localhost="127.0.0.1"
         sudo nmcli con mod ens224 ipv4.dns "$localhost"
 
+        # 7 - Instalação e configuração do Fail2Ban para proteger o BIND
+        # O que faz: Instala o Fail2Ban e configura uma jail específica para proteger o servidor DNS contra ataques.
+
+        # O que faz o Fail2Ban: Ferramenta que monitora logs e bloqueia IPs que mostram comportamento malicioso.
+        # O que faz a jail: Conjunto de regras que definem como o Fail2Ban deve agir para um serviço específico (neste caso, o BIND).
+        # O que faz o filter named-refused: Filtro pré-definido que detecta tentativas de acesso recusadas no BIND.
+        # O que faz o logpath: Caminho para o ficheiro de log que o Fail2Ban irá monitorizar.
+        # O que faz o maxretry: Número máximo de tentativas falhadas antes de banir o IP.
+        # O que faz o findtime: Período de tempo (em segundos) durante o qual as tentativas são contadas.
+        # O que faz o bantime: Duração (em segundos) do banimento do IP.
+        # O que faz o ignoreip: Lista de IPs que nunca serão banidos (ex: localhost e IP do servidor DNS).
+        # O que faz o action firewallcmd-ipset: Ação que usa o firewalld para bloquear IPs maliciosos.
+        # O que faz o systemctl enable --now: Habilita o serviço (auto-start) e inicia-o imediatamente.
+        # O que faz o systemctl restart named: Reinicia o serviço BIND para aplicar novas configurações de log.
+        # O que faz o systemctl status: Mostra o estado atual do serviço (ativo, inativo, erros).
+        # O que faz o sleep 0.5: Pausa a execução por 0.5 segundos para melhor legibilidade.
+        # O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
+        # O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
+        # O que faz o grep -q: Verifica silenciosamente se uma string existe num ficheiro (sem produzir saída).
+        # O que faz o -a: Anexa (append) conteúdo ao ficheiro sem sobrescrever o que já existe.
+        # O que faz o if ... then ... fi: Estrutura condicional para verificar se a inclusão já existe.
+        # O que faz o exit 1: Sai do script com código de erro 1 em caso de falha. Juntamente com o set -e no início, isso interrompe o script.
+
+        echo ""
+        echo "=========================================="
+        echo "   INSTALAÇÃO E CONFIGURAÇÃO DO FAIL2BAN"
+        echo "=========================================="
+        echo ""
+
+        # 7.1 - Instalar EPEL e Fail2Ban (Comandos Separados para Robustez)
+
+        echo "A instalar EPEL..."
+        sudo dnf install -y epel-release 
+
+        echo "A instalar Fail2Ban e firewalld integration..."
+
+        # Fail2Ban e fail2ban-firewalld estão agora no EPEL
+
+        sudo dnf install -y fail2ban fail2ban-firewalld
+
+        echo "Fail2Ban instalado com sucesso!"
+        sleep 0.5
+
+        # 7.2 - Configurar Logs de Segurança no BIND (Essencial para o Fail2Ban)
+        # Garantimos que o BIND está a usar um ficheiro de log que o Fail2Ban pode ler.
+
+        echo "A configurar logging de segurança no named.conf para o Fail2Ban..."
+
+        # Este comando deve ANEXAR ou SUBSTITUIR a secção 'logging' no named.conf
+        # NOTA: O bloco abaixo garante que o logging necessário existe.
+
+        # O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
+        # O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
+        # O que faz o EOF: Delimitador para indicar o início e fim do conteúdo a ser escrito.
+        # O que faz o channel security_log: Define um canal de logging específico para eventos de segurança.
+        # O que faz o file "/var/log/named/security.log": Define o ficheiro onde os logs de segurança serão armazenados.
+        # O que faz o severity info: Define o nível de severidade dos logs a serem capturados.
+        # O que faz o print-time yes: Inclui timestamps nos logs para melhor rastreamento.
+        # O que faz o category security { security_log; };: Associa a categoria de segurança ao canal de logging definido.
+        # O que faz o category client { security_log; };: Regista eventos relacionados com clientes (ex: recusas de acesso).
+        # O que faz o category queries { default_log; };: Mantém o logging padrão para consultas DNS normais.
+        # O que faz o default_log: Canal de logging padrão já existente no named.conf.
+
+        sudo tee /etc/named/fail2ban_logging.conf >/dev/null << EOF
+logging {
+    channel security_log {
+        file "/var/log/named/security.log" versions 3 size 5m;
+        severity info;
+        print-time yes;
+    };
+    category security { security_log; };
+    category client { security_log; };
+    category queries { default_log; };
+};
+EOF
+
+        # 7.3 - Incluir o novo ficheiro de logging no named.conf (se ainda não estiver)
+        # O que faz: Garante que o named.conf inclui a configuração de logging necessária para o Fail2Ban.
+
+        # O que faz o grep -q: Verifica silenciosamente se uma string existe num ficheiro (sem produzir saída).
+        # O que faz o if ... then ... fi: Estrutura condicional para verificar se a inclusão já existe.
+        # O que faz o tee -a: Anexa (append) conteúdo ao ficheiro sem sobrescrever o que já existe.
+        # O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
+        # O que faz o include "/etc/named/fail2ban_logging.conf": Linha que inclui o ficheiro de logging no named.conf.
+        # O que faz o /etc/named.conf: Ficheiro principal de configuração do BIND.
+        # O que faz o exit 1: Sai do script com código de erro 1 em caso de falha. Juntamente com o set -e no início, isso interrompe o script.
+        # O que faz o sleep 0.5: Pausa a execução por 0.5 segundos para melhor legibilidade.
+
+        if ! grep -q "include \"/etc/named/fail2ban_logging.conf\"" /etc/named.conf; then
+            echo "include \"/etc/named/fail2ban_logging.conf\";" | sudo tee -a /etc/named.conf >/dev/null
+        fi
+
+        # 7.4 - Criar Jail (Regra) para o BIND DNS
+        # O que faz: Define os parâmetros de banimento para o serviço DNS.
+
+        echo "A criar jail 'bind-dns' em /etc/fail2ban/jail.d/bind-dns.conf..."
+
+        IP_TO_IGNORE="127.0.0.1/8 $IP_SERVIDOR_DNS"
+
+        sudo tee /etc/fail2ban/jail.d/bind-dns.conf >/dev/null << EOF
+[bind-dns]
+enabled  = true
+port     = domain
+protocol = udp,tcp
+filter   = named-refused
+logpath  = /var/log/named/security.log
+maxretry = 10
+findtime = 60
+bantime  = 3600
+ignoreip = $IP_TO_IGNORE
+action   = firewallcmd-ipset
+EOF
+
+        # 7.5 - Iniciar e habilitar o serviço Fail2Ban
+
+        echo "A iniciar e habilitar o serviço Fail2Ban..."
+
+        # Reiniciar named para garantir que as novas configs de log são carregadas
+
+        sudo systemctl restart named
+
+        sudo systemctl enable --now fail2ban
+
+        echo "Fail2Ban configurado para proteger o BIND/DNS."
+        sleep 0.5
+
         # 8 - Configurar DNS da interface LAN para localhost
         # O que faz: Define o servidor DNS da interface LAN para o próprio servidor (localhost).
+        
         # O que faz o ipv4.dns: Define o servidor DNS que a interface irá usar.
         # O que faz o 127.0.0.1: Endereço de loopback (localhost) - faz o servidor usar o seu próprio BIND.
         # O que faz o connection up: Recarrega a interface para aplicar a nova configuração de DNS.
@@ -163,6 +294,7 @@ case $OPCAO_MENU in
 
         # 9 - Extrair octetos do IP para criar zona reversa
         # O que faz: Divide o endereço IP em 4 partes (octetos) para poder criar a zona de resolução inversa.
+        
         # O que é zona reversa: Permite descobrir o nome de domínio a partir de um endereço IP (IP → nome).
         # O que faz o REVERSE_ZONE_ID: Cria o nome da zona reversa no formato DNS padrão (in-addr.arpa).
         # O que faz o cut -d. -fN: Extrai o N-ésimo octeto do IP usando o ponto (.) como separador.
