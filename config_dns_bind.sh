@@ -320,11 +320,11 @@ EOF
             exit 1
         fi
 
-        echo "✓ DOMINIO: $DOMINIO"
-        echo "✓ IP_SERVIDOR_DNS: $IP_SERVIDOR_DNS"
-        echo "✓ OCTETOS: $OCTETO_1.$OCTETO_2.$OCTETO_3.$OCTETO_4"
-        echo "✓ SERIAL_DATE: $SERIAL_DATE"
-        echo "✓ REVERSE_ZONE_ID: $REVERSE_ZONE_ID"
+        echo "DOMINIO: $DOMINIO"
+        echo "IP_SERVIDOR_DNS: $IP_SERVIDOR_DNS"
+        echo "OCTETOS: $OCTETO_1.$OCTETO_2.$OCTETO_3.$OCTETO_4"
+        echo "SERIAL_DATE: $SERIAL_DATE"
+        echo "REVERSE_ZONE_ID: $REVERSE_ZONE_ID"
 
         echo ""
         echo "Todas as variáveis validadas com sucesso!"
