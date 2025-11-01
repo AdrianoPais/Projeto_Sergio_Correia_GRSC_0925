@@ -38,7 +38,7 @@ case $OPCAO_MENU in
         # O que faz: Garante que o script tem permissões corretas para ser executado.
         # O que faz o chmod 775: Define permissões de leitura, escrita e execução para o proprietário e grupo, e leitura e execução para outros.
 
-        chmod 775 config_dns_bindV2.sh
+        chmod 775 config_dns_bind.sh
 
         # 2 - Recolha de informações do utilizador
         # O que faz: Solicita ao utilizador os dados necessários para configurar o servidor DNS.
