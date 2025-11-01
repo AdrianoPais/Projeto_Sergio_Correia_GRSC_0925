@@ -289,6 +289,48 @@ EOF
         sleep 0.5
         echo ""
 
+        # 9.5 - VALIDAÇÃO CRÍTICA: Verificar se as variáveis estão definidas
+        # O que faz: Garante que todas as variáveis necessárias existem antes de criar os ficheiros de zona.
+
+        echo ""
+        echo "=========================================="
+        echo "   VALIDAÇÃO DE VARIÁVEIS"
+        echo "=========================================="
+        echo ""
+
+        echo "A validar variáveis necessárias..."
+
+        if [ -z "$DOMINIO" ]; then
+            echo "ERRO CRÍTICO: Variável DOMINIO não está definida!"
+            exit 1
+        fi
+
+        if [ -z "$IP_SERVIDOR_DNS" ]; then
+            echo "ERRO CRÍTICO: Variável IP_SERVIDOR_DNS não está definida!"
+            exit 1
+        fi
+
+        if [ -z "$OCTETO_1" ] || [ -z "$OCTETO_2" ] || [ -z "$OCTETO_3" ] || [ -z "$OCTETO_4" ]; then
+            echo "ERRO CRÍTICO: Octetos não estão definidos!"
+            exit 1
+        fi
+
+        if [ -z "$SERIAL_DATE" ]; then
+            echo "ERRO CRÍTICO: Variável SERIAL_DATE não está definida!"
+            exit 1
+        fi
+
+        echo "✓ DOMINIO: $DOMINIO"
+        echo "✓ IP_SERVIDOR_DNS: $IP_SERVIDOR_DNS"
+        echo "✓ OCTETOS: $OCTETO_1.$OCTETO_2.$OCTETO_3.$OCTETO_4"
+        echo "✓ SERIAL_DATE: $SERIAL_DATE"
+        echo "✓ REVERSE_ZONE_ID: $REVERSE_ZONE_ID"
+
+        echo ""
+        echo "Todas as variáveis validadas com sucesso!"
+        sleep 0.5
+        echo ""
+
         # 10 - Criar ficheiro de zona direta (Forward Zone)
         # O que faz: Cria o ficheiro que resolve nomes de domínio para endereços IP (nome → IP).
         # O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
