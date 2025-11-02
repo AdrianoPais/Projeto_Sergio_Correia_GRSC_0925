@@ -72,7 +72,7 @@ while true; do
 
     # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a validação do IP é independente do serviço DHCP utilizado.
 
-	read -p "Digite o IP desejado para o Servidor (Inserir unicamente IPs de Classe C): " IP_SERVIDOR
+	read -p "Digite o IP desejado para o Servidor (Exemplo: 192.168.0.5): " IP_SERVIDOR
 
 	TERCEIRO_OCTETO=$(echo "$IP_SERVIDOR" | cut -d'.' -f3)
 	QUARTO_OCTETO=$(echo "$IP_SERVIDOR" | cut -d'.' -f4)
@@ -213,7 +213,7 @@ for i in {1..40}; do
 done
 
 echo " ]"
-echo " Feito!"
+echo "Feito!"
 
 # 5 - Configuração do Acesso à Internet
 # O que faz: Pergunta ao utilizador se os clientes DHCP devem ter acesso à Internet. Se sim, configura o gateway e os servidores DNS apropriados.
@@ -635,35 +635,24 @@ echo "A configurar regras de proteção..."
 
 sudo tee /etc/fail2ban/jail.d/kea-dhcp.conf >/dev/null << EOF
 # ============================================================================ #
-# JAIL KEA DHCP - Configuração Simples
+# JAIL KEA DHCP - Configuração Final
 # ============================================================================ #
 
 [kea-dhcp]
-# Ativar esta jail
 enabled  = true
-
 filter   = kea-dhcp
-
-# Portas usadas pelo DHCP
 port     = 67,68
 protocol = udp
-
-# Onde procurar os logs do KEA
 logpath  = /var/log/kea/kea-dhcp4.log
-# Backend para o Kea que usa logs JSON. 'polling' é o mais seguro.
-backend  = polling
+backend  = polling 
+maxretry = 20
+findtime = 120
+bantime  = 7200
 
-# Regras de bloqueio:
-maxretry = 20       # Após 20 tentativas suspeitas...
-findtime = 120      # ...em 120 segundos (2 minutos)...
-bantime  = 7200     # ...bloqueia por 7200 segundos (2 horas)
-
-# IPs que NUNCA serão bloqueados
+# IPs que NUNCA serão bloqueados: Certificar-se de que a variável é resolvida.
 ignoreip = 127.0.0.1/8 ${IP_SERVIDOR}
 
-# Como bloquear (usar a firewall do sistema)
 action   = firewallcmd-ipset
-
 EOF
 
 echo "Configuração criada: /etc/fail2ban/jail.d/kea-dhcp.conf"
