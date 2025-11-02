@@ -392,8 +392,22 @@ sleep 0.5
 echo "WAN ($WAN_IF) -> Internet via NAT"
 echo "LAN ($LAN_IF) -> IP fixo $IP_SERVIDOR/24 + DHCP KEA"
 
-# 7 - Edição do Config do DHCP (Kea)
+# 7 - Instalação do Fail2ban
+
+echo "A instalar EPEL..."
+sudo dnf install -y epel-release 
+
+echo "A instalar Fail2Ban e firewalld integration..."
+sleep 0.5
+
+sudo dnf install -y fail2ban fail2ban-firewalld
+
+echo "Fail2Ban instalado com sucesso!"
+sleep 0.5
+
+# 8 - Edição do Config do DHCP (Kea)
 # O que faz: Escreve o ficheiro de configuração JSON do Kea DHCPv4 com os parâmetros fornecidos.
+
 # O que faz o sudo tee: Permite escrever múltiplas linhas de texto em ficheiros que requerem privilégios de superutilizador.
 # O que faz o >/dev/null: Redireciona a saída padrão para /dev/null, suprimindo a saída do comando no terminal.
 # O que faz o << DHCP: Inicia um "here document" que permite inserir múltiplas linhas de texto até encontrar a palavra-chave DHCP.
@@ -418,6 +432,11 @@ echo "LAN ($LAN_IF) -> IP fixo $IP_SERVIDOR/24 + DHCP KEA"
 # O que faz o debuglevel: Define o nível de detalhe dos logs de debug (0 neste caso, indicando nenhum detalhe adicional).
 
 # O que difere de DHCP tradicional: A configuração do Kea DHCPv4 é baseada em JSON, diferente do formato tradicional usado pelo dhcpd, que é baseado em texto simples.
+
+read -p "Tempo de concessão dos leases desejado, em segundos (Ex: 3600 para 1 hora): " LEASE_TIME
+
+RENEW_TIMER=$((LEASE_TIME / 2))
+REBIND_TIMER=$((LEASE_TIME * 7 / 8))
 
 sudo mkdir -p /etc/kea
 sudo chmod 755 /etc/kea
@@ -444,9 +463,9 @@ if [ "$ACESSO" == "1" ]; then
             "max-reclaim-time": 250,
             "unwarned-reclaim-cycles": 5
         },
-        "renew-timer": 900,
-        "rebind-timer": 1800,
-        "valid-lifetime": 3600,
+        "renew-timer": ${RENEW_TIMER},
+        "rebind-timer": ${REBIND_TIMER},
+        "valid-lifetime": ${LEASE_TIME},
         "option-data": [
             {
                 "name": "domain-name-servers",
@@ -553,7 +572,71 @@ if ! sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf; then
     sleep 0.5
 fi
 
-# 8 - Add o Service à firewall
+# 8 - Configuração do Fail2Ban para o KEA DHCP
+# O que faz: Cria uma configuração personalizada do Fail2Ban para monitorizar os logs do Kea DHCPv4 e bloquear IPs que apresentem comportamento suspeito, como múltiplas tentativas de DHCPDISCOVER.
+
+# O que faz o sudo tee /etc/fail2ban/jail.d/kea-dhcp.conf: Cria um ficheiro de configuração específico para o Kea DHCP dentro do diretório de jails do Fail2Ban.
+# O que faz o enabled = true: Ativa a jail para o Kea DHCP.
+# O que faz o port = 67,68: Especifica as portas UDP usadas pelo DHCP.
+# O que faz o logpath = /var/log/kea/kea-dhcp4.log: Define o caminho do ficheiro de log do Kea DHCP que o Fail2Ban irá monitorizar.
+# O que faz o maxretry = 20: Define o número máximo de tentativas suspeitas antes de bloquear um IP.
+# O que faz o findtime = 120: Define o período de tempo em segundos durante o qual as tentativas são contadas.
+# O que faz o bantime = 7200: Define o tempo em segundos que um IP ficará bloqueado.
+# O que faz o ignoreip = Faze com que certos IPs nunca sejam bloqueados, incluindo o localhost e o IP do servidor.
+# O que faz o action = firewallcmd-ipset: Especifica a ação a ser tomada quando um IP é bloqueado, usando a firewall do sistema.
+# O que faz o failregex = .*DHCPDISCOVER from .* via .*: Define o padrão de log que o Fail2Ban irá procurar para identificar tentativas suspeitas (múltiplos DHCPDISCOVER).
+
+echo ""
+echo "A configurar regras de proteção..."
+
+sudo tee /etc/fail2ban/jail.d/kea-dhcp.conf >/dev/null << EOF
+# ============================================================================ #
+# JAIL KEA DHCP - Configuração Simples
+# ============================================================================ #
+
+[kea-dhcp]
+# Ativar esta jail
+enabled  = true
+
+# Portas usadas pelo DHCP
+port     = 67,68
+protocol = udp
+
+# Onde procurar os logs do KEA
+logpath  = /var/log/kea/kea-dhcp4.log
+
+# Regras de bloqueio:
+maxretry = 20       # Após 20 tentativas suspeitas...
+findtime = 120      # ...em 120 segundos (2 minutos)...
+bantime  = 7200     # ...bloqueia por 7200 segundos (2 horas)
+
+# IPs que NUNCA serão bloqueados
+ignoreip = 127.0.0.1/8 ${IP_SERVIDOR}
+
+# Como bloquear (usar a firewall do sistema)
+action   = firewallcmd-ipset
+
+# O que procurar nos logs (padrão simples: múltiplos DHCPDISCOVER)
+failregex = .*DHCPDISCOVER from .* via .*
+EOF
+
+echo "Configuração criada: /etc/fail2ban/jail.d/kea-dhcp.conf"
+sleep 0.5
+
+# Passo 4: Iniciar o Fail2Ban
+echo ""
+echo "A iniciar o Fail2Ban..."
+
+sudo systemctl enable --now fail2ban
+
+echo "Fail2Ban ativo!"
+sleep 0.5
+
+echo "Proteção ativa contra ataques DHCP."
+echo "IPs maliciosos serão bloqueados automaticamente."
+sleep 0.5
+
+# 9 - Add o Service à firewall
 # O que faz: Configura a firewall (firewalld) para permitir o serviço DHCP (kea/dhcp), garantindo que os clientes podem comunicar com o servidor.
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da firewall é independente do serviço DHCP utilizado.
@@ -570,7 +653,7 @@ sudo systemctl restart firewalld
 echo "Serviço firewalld reiniciado."
 sleep 0.5
 
-# 9 - Restart dos Services
+# 10 - Restart dos Services
 # O que faz: Inicia o serviço do servidor DHCP (dhcpd) e garante que ele arranca automaticamente no boot. O sudo journalctl é usado para mostrar os logs do serviço, confirmando que o DHCP está ativo e a funcionar.
 # O que faz o -t do kea-dhcp4: Testa a configuração do Kea DHCPv4 antes de iniciar o serviço, garantindo que não há erros no ficheiro de configuração.
 
@@ -592,8 +675,9 @@ echo "Recomenda-se um reboot do sistema para garantir que todas as alterações 
 echo "Para reiniciar o sistema, execute: reboot"
 sleep 0.5
 
-# 10 - Configuração final
+# 11 - Configuração final
 # O que faz: Oferece ao utilizador a opção de executar verificações finais, como verificar o status do serviço, listar os leases atribuídos e visualizar as últimas linhas do log.
+
 # O que faz o case: Estrutura de controle em bash que permite executar diferentes blocos de código com base na opção escolhida pelo utilizador.
 # O que faz o sudo systemctl status kea-dhcp4: Verifica o status do serviço Kea DHCPv4, mostrando se está ativo e a funcionar corretamente.
 # O que faz o cat /var/lib/kea/kea-leases4.csv: Exibe o conteúdo do ficheiro de leases, mostrando os endereços IP atribuídos aos clientes DHCP.
@@ -608,12 +692,13 @@ sleep 0.5
 while true; do
     echo ""
     echo "Deseja executar verificações finais?"
-    echo "1) Verificar status do serviço;"
+    echo "1) Verificar status do serviço KEA;"
     echo "2) Ver leases atribuídos;"
     echo "3) Ver últimas linhas do log;"
-    echo "4) Sair."
+    echo "4) Verificar status do Fail2Ban;"
+    echo "5) Sair."
     echo ""
-    read -p "Escolha uma opção (1-4): " OPCAO_VERIFICACAO
+    read -p "Escolha uma opção (1-5): " OPCAO_VERIFICACAO
 
     case $OPCAO_VERIFICACAO in
         1)
@@ -633,32 +718,43 @@ while true; do
         3)
             echo ""
             echo "--- Últimas 10 linhas do Log ---"
-            if [ -f /var/log/kea-dhcp4.log ]; then
-                tail -n 10 /var/log/kea-dhcp4.log
+            if [ -f /var/log/kea/kea-dhcp4.log ]; then
+                tail -n 10 /var/log/kea/kea-dhcp4.log
             else
                 echo "Ficheiro de log ainda não existe."
             fi
             ;;
         4)
             echo ""
+            echo "--- Status do Fail2Ban ---"
+            sudo systemctl status fail2ban
+            echo ""
+            echo "--- Jail KEA DHCP ---"
+            sudo fail2ban-client status kea-dhcp
+            ;;
+        5)
+            echo ""
             echo "A sair do menu de verificações."
             break
             ;;
         *)
             echo ""
-            echo "Opção inválida. Por favor, escolha entre 1 e 4."
+            echo "Opção inválida. Por favor, escolha entre 1 e 5."
             ;;
     esac
 done
 
 echo ""
 echo "=========================================="
-echo "   COMANDOS ÚTEIS PARA O FUTURO"
+echo "   COMANDOS ÚTEIS PARA O FUTURO"
 echo "=========================================="
 echo ""
 echo "- Ver leases: cat /var/lib/kea/kea-leases4.csv"
-echo "- Ver logs: tail -f /var/log/kea-dhcp4.log"
-echo "- Status: systemctl status kea-dhcp4"
+echo "- Ver logs KEA: tail -f /var/log/kea/kea-dhcp4.log"
+echo "- Status KEA: systemctl status kea-dhcp4"
+echo "- Status Fail2Ban: sudo fail2ban-client status kea-dhcp"
+echo "- Ver IPs banidos: sudo fail2ban-client status kea-dhcp"
+echo "- Desbanir IP: sudo fail2ban-client set kea-dhcp unbanip <IP>"
 echo ""
 echo "Recomenda-se um reboot do sistema para garantir que todas as alterações tenham efeito."
 echo "Para reiniciar o sistema, execute: reboot"
