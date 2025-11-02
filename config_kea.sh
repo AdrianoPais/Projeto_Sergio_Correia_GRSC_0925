@@ -104,7 +104,8 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
 
     # 4.1 - Solicitar o escopo de IPs desejado e gateway/DNS
     # O que faz: Pede ao utilizador apenas o 4º octeto do range, gateway e DNS, para formar os IPs completos
-	# O que faz o -p do read: Exibe uma mensagem para o utilizador antes de esperar pela entrada.
+	
+    # O que faz o -p do read: Exibe uma mensagem para o utilizador antes de esperar pela entrada.
 
     read -p "Qual vai ser o início do range DHCP (4º octeto)? " OCTETO_INICIO_RANGE
     read -p "Qual vai ser o fim do range DHCP (4º octeto)? " OCTETO_FIM_RANGE
@@ -113,7 +114,8 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
 
     # 4.2 - Extrair a subrede do servidor
 	# O que faz: Usa o cut para extrair os primeiros três octetos do IP do servidor, formando a sub-rede.
-	# O que faz o cut: Divide uma string em partes com base em um delimitador especificado (neste caso, o ponto ".") e extrai as partes desejadas. - cut -d'.' -f1-3 ( Semelhante ao .split em Python)
+	
+    # O que faz o cut: Divide uma string em partes com base em um delimitador especificado (neste caso, o ponto ".") e extrai as partes desejadas. - cut -d'.' -f1-3 ( Semelhante ao .split em Python)
 
     IP_SUBNET_SERVIDOR_C=$(echo "$IP_SERVIDOR" | cut -d'.' -f1-3)
 
@@ -140,14 +142,13 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     
     # O que faz o >=: Operador de comparação em bash, usado para verificar se um valor é maior ou igual a outro.
 
-    # Validação 1: Início do range deve ser menor que o fim
-
     if (( OCTETO_INICIO_RANGE >= OCTETO_FIM_RANGE )); then
         echo "Erro 6! Início do range ($OCTETO_INICIO_RANGE) deve ser menor que o fim ($OCTETO_FIM_RANGE)."
         continue
     fi
 
-    # Validação 2: IP do servidor não pode estar dentro do range DHCP.
+    # 4.7 - Validação 2: IP do Servidor não pode estar dentro do range DHCP
+    # O que faz: Garante que o 4º octeto do IP do servidor não esteja dentro do range DHCP definido.
 
     QUARTO_OCTETO_SERVIDOR=$(echo "$IP_SERVIDOR" | cut -d'.' -f4)
 
@@ -156,15 +157,15 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
         continue
     fi
 
-    # Validação 3: IP do Gateway não pode estar dentro do range DHCP (Recomendação de segurança/padrão)
-    # O que faz: Garante que o 4º octeto do gateway não esteja dentro do range DHCP definido.
+    # 4.8 - Validação 3: IP do DNS não pode estar dentro do range DHCP
+    # O que faz: Garante que o 4º octeto do IP do DNS não esteja dentro do range DHCP definido.
 
     if (( OCTETO_IP_GATEWAY >= OCTETO_INICIO_RANGE && OCTETO_IP_GATEWAY <= OCTETO_FIM_RANGE )); then
         echo "Erro 8! O 4º octeto do Gateway ($OCTETO_IP_GATEWAY) não deve estar dentro do range DHCP."
         continue
     fi
 
-    # 4.7 - Mostrar resumo para confirmação
+    # 4.9 - Mostrar resumo para confirmação
 
     echo -n "[ "
 
@@ -189,7 +190,8 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     echo "Domain Name:         $DOMAIN_NAME"
     echo "---------------------------------------------------------"
 
-    # 4.8 - Solicitar confirmação final
+    # 4.10 - Solicitar confirmação final
+    # O que faz: Pede ao utilizador para confirmar se todos os valores estão corretos antes de prosseguir.
 
     read -p "Validação básica concluída! Está tudo correto? (y/n): " VERIFICACAO
 
@@ -227,11 +229,10 @@ echo "Feito!"
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração do gateway e DNS é independente do serviço DHCP utilizado.
 
 read -p "Deseja que os clientes tenham acesso à Internet? (y/N): " ACESSO_INTERNET
-ACESSO_INTERNET=${ACESSO_INTERNET,,}
 
-if [ "$ACESSO_INTERNET" == "y" ]; then
+if [ "$ACESSO_INTERNET" == "y" ] && [ "$ACESSO_INTERNET" == "Y" ]; then
+
     ACESSO=1
-    
     # 5.1 - Definir o GATEWAY para a rede DHCP: É O PRÓPRIO SERVIDOR (DHCP/NAT)
     # O que faz: Define o gateway para os clientes DHCP como o IP do servidor, assumindo que este atuará como gateway para a rede LAN.
 
@@ -250,7 +251,7 @@ if [ "$ACESSO_INTERNET" == "y" ]; then
         IP_DNS_EXTERNO="1.1.1.1"
     fi
     
-    # 5.4 - Configurar o DNS Primário para os CLIENTES DHCP (Este é o seu Servidor BIND na LAN)
+    # 5.4 - Configurar o DNS Primário para os Clientes DHCP (Este é o seu Servidor BIND na LAN)
     # O que faz: Pede ao utilizador para inserir o IP do servidor BIND/DNS na LAN, que será usado como DNS primário pelos clientes DHCP.
 
     read -p "Insira o IP do seu Servidor BIND/DNS na LAN Segment (Será o DNS Primário dos clientes): " IP_DNS_BIND_PRIMARIO
@@ -317,6 +318,8 @@ echo "Interface WAN configurada com IP: ${WAN_IP:-"A aguardar DHCP..."}"
 # 6.2 - Configurar LAN com IP do utilizador (já definido anteriormente)
 # O que faz: Configura a interface LAN com o IP estático fornecido pelo utilizador, juntamente com o gateway e o servidor DNS.
 
+# O que faz o ip -4 addr show: Exibe os endereços IPv4 atribuídos às interfaces de rede.
+
 echo ""
 echo "A configurar interface LAN ($LAN_IF) com IP $IP_SERVIDOR/24..."
 sleep 0.5
@@ -356,8 +359,6 @@ echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf > /dev/null
 # O que faz o -i: Especifica a interface de entrada para a regra.
 # O que faz o -o: Especifica a interface de saída para a regra.
 # O que faz o ACCEPT: Especifica que os pacotes correspondentes à regra devem ser aceitos e encaminhados.
-# O que faz o sudo: Executa os comandos com privilégios de superutilizador, necessários para modificar as regras do iptables.
-# O que faz o sleep 0.5: Pausa a execução do script por meio segundo, proporcionando uma melhor experiência visual ao utilizador.
 
 echo ""
 echo "Aplicando regras de NAT..."
@@ -398,6 +399,7 @@ echo "WAN ($WAN_IF) -> Internet via NAT"
 echo "LAN ($LAN_IF) -> IP fixo $IP_SERVIDOR/24 + DHCP KEA"
 
 # 7 - Instalação do Fail2ban
+# O que faz: Instala o Fail2Ban e a integração com o firewalld para proteger o servidor contra tentativas de acesso não autorizadas.
 
 echo "A instalar EPEL..."
 sudo dnf install -y epel-release 
@@ -563,6 +565,9 @@ else
 DHCP
 fi
 
+# 8.1 - Permissões dos Ficheiros de Configuração e Log do Kea DHCPv4
+# O que faz: Define as permissões corretas para o ficheiro de configuração do Kea DHCPv4 e o ficheiro de log, garantindo que apenas o utilizador root tenha acesso de escrita.
+
 sudo chmod 644 /etc/kea/kea-dhcp4.conf
 sudo chown root:root /etc/kea/kea-dhcp4.conf
 
@@ -577,14 +582,8 @@ if ! sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf; then
     sleep 0.5
 fi
 
-# 8 - Configuração do Fail2Ban para o Kea DHCPv4
+# 9 - Configuração do Fail2Ban para o Kea DHCPv4
 # O que faz: Configura o Fail2Ban para monitorizar os logs do Kea DHCPv4 e bloquear IPs que apresentem comportamento suspeito, como múltiplas tentativas de DHCPDISCOVER.
-
-echo ""
-echo "A configurar regras de proteção..."
-
-# 8.1 - Criação do ficheiro de filtro KEA DHCP (kea-dhcp.conf) para logs JSON
-# O que faz: Cria um ficheiro de filtro personalizado para o Fail2Ban, permitindo-lhe analisar os logs JSON do Kea DHCPv4 e identificar padrões de comportamento suspeito.
 
 # O que faz o sudo tee /etc/fail2ban/filter.d/kea-dhcp.conf: Cria um ficheiro de filtro personalizado para o Kea DHCP dentro do diretório de filtros do Fail2Ban.
 # O que faz o failregex: Define os padrões de expressão regular que o Fail2Ban irá procurar nos logs para identificar tentativas suspeitas.
@@ -615,19 +614,19 @@ EOF
 echo "Ficheiro de filtro /etc/fail2ban/filter.d/kea-dhcp.conf criado."
 sleep 0.5
 
-# 8.1 - Configuração do Fail2Ban para o KEA DHCP
-# O que faz: Cria uma configuração personalizada do Fail2Ban para monitorizar os logs do Kea DHCPv4 e bloquear IPs que apresentem comportamento suspeito, como múltiplas tentativas de DHCPDISCOVER.
+# 10 - Configuração do Fail2Ban para o KEA DHCP
+# O que faz: Cria uma jail personalizada no Fail2Ban para o Kea DHCP, definindo as regras de monitorização e bloqueio.
 
-# O que faz o sudo tee /etc/fail2ban/jail.d/kea-dhcp.conf: Cria um ficheiro de configuração específico para o Kea DHCP dentro do diretório de jails do Fail2Ban.
+# O que faz o sudo tee /etc/fail2ban/jail.d/kea-dhcp.conf: Cria um ficheiro de configuração de jail personalizado para o Kea DHCP dentro do diretório de jails do Fail2Ban.
 # O que faz o enabled = true: Ativa a jail para o Kea DHCP.
-# O que faz o port = 67,68: Especifica as portas UDP usadas pelo DHCP.
+# O que faz o filter = kea-dhcp: Especifica o filtro a ser usado para esta jail, que foi definido anteriormente.
+# O que faz o port = 67,68: Define as portas UDP que o Fail2Ban irá monitorizar para o Kea DHCP.
+# O que faz o protocol = udp: Especifica o protocolo de rede (UDP) a ser monitorizado.
 # O que faz o logpath = /var/log/kea/kea-dhcp4.log: Define o caminho do ficheiro de log do Kea DHCP que o Fail2Ban irá monitorizar.
-# O que faz o maxretry = 20: Define o número máximo de tentativas suspeitas antes de bloquear um IP.
-# O que faz o findtime = 120: Define o período de tempo em segundos durante o qual as tentativas são contadas.
-# O que faz o bantime = 7200: Define o tempo em segundos que um IP ficará bloqueado.
-# O que faz o ignoreip = Faze com que certos IPs nunca sejam bloqueados, incluindo o localhost e o IP do servidor.
-# O que faz o action = firewallcmd-ipset: Especifica a ação a ser tomada quando um IP é bloqueado, usando a firewall do sistema.
-# O que faz o failregex = .*DHCPDISCOVER from .* via .*: Define o padrão de log que o Fail2Ban irá procurar para identificar tentativas suspeitas (múltiplos DHCPDISCOVER).
+# O que faz o backend = polling: Define o método de monitorização do ficheiro de log.
+# O que faz o maxretry = 20: Define o número máximo de tentativas permitidas antes de um IP ser bloqueado.
+# O que faz o findtime = 120: Define o período de tempo (em segundos) durante o qual as tentativas são contadas.
+# O que faz o bantime = 7200: Define a duração (em segundos) do bloqueio para IPs que excedam o limite de tentativas.
 
 echo ""
 echo "A configurar regras de proteção..."
@@ -657,7 +656,7 @@ EOF
 echo "Configuração criada: /etc/fail2ban/jail.d/kea-dhcp.conf"
 sleep 0.5
 
-# 8.2 - Iniciar o Fail2Ban
+# 11 - Iniciar o Fail2Ban
 # O que faz: Ativa e inicia o serviço Fail2Ban, garantindo que ele arranca automaticamente no boot.
 
 echo ""
@@ -672,7 +671,7 @@ echo "Proteção ativa contra ataques DHCP."
 echo "IPs maliciosos serão bloqueados automaticamente."
 sleep 0.5
 
-# 9 - Add o Service à firewall
+# 12 - Add o Service à firewall
 # O que faz: Configura a firewall (firewalld) para permitir o serviço DHCP (kea/dhcp), garantindo que os clientes podem comunicar com o servidor.
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da firewall é independente do serviço DHCP utilizado.
@@ -689,8 +688,9 @@ sudo systemctl restart firewalld
 echo "Serviço firewalld reiniciado."
 sleep 0.5
 
-# 10 - Restart dos Services
+# 13 - Restart dos Services
 # O que faz: Inicia o serviço do servidor DHCP (dhcpd) e garante que ele arranca automaticamente no boot. O sudo journalctl é usado para mostrar os logs do serviço, confirmando que o DHCP está ativo e a funcionar.
+
 # O que faz o -t do kea-dhcp4: Testa a configuração do Kea DHCPv4 antes de iniciar o serviço, garantindo que não há erros no ficheiro de configuração.
 
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois o controlo dos serviços é independente do serviço DHCP utilizado.
@@ -711,7 +711,7 @@ echo "Recomenda-se um reboot do sistema para garantir que todas as alterações 
 echo "Para reiniciar o sistema, execute: reboot"
 sleep 0.5
 
-# 11 - Configuração final
+# 14 - Configuração final
 # O que faz: Oferece ao utilizador a opção de executar verificações finais, como verificar o status do serviço, listar os leases atribuídos e visualizar as últimas linhas do log.
 
 # O que faz o case: Estrutura de controle em bash que permite executar diferentes blocos de código com base na opção escolhida pelo utilizador.
@@ -740,11 +740,19 @@ while true; do
         1)
             echo ""
             echo "--- Status do Serviço Kea DHCP4 ---"
+
+            # 14.1 - Verificar status do serviço KEA
+            # O que faz: Mostra o status atual do serviço Kea DHCPv4.
+
             sudo systemctl status kea-dhcp4
             ;;
         2)
             echo ""
             echo "--- Leases Atribuídos ---"
+
+            # 14.2 - Ver leases atribuídos
+            # O que faz: Exibe a lista de leases atualmente atribuídos pelo servidor DHCP.
+
             if [ -f /var/lib/kea/kea-leases4.csv ]; then
                 cat /var/lib/kea/kea-leases4.csv
             else
@@ -754,6 +762,10 @@ while true; do
         3)
             echo ""
             echo "--- Últimas 10 linhas do Log ---"
+
+            # 14.3 - Ver últimas linhas do log
+            # O que faz: Mostra as últimas 10 linhas do ficheiro de log do Kea DHCPv4.
+
             if [ -f /var/log/kea/kea-dhcp4.log ]; then
                 tail -n 10 /var/log/kea/kea-dhcp4.log
             else
@@ -763,9 +775,17 @@ while true; do
         4)
             echo ""
             echo "--- Status do Fail2Ban ---"
+
+            # 14.4 - Verificar status do Fail2Ban
+            # O que faz: Mostra o status atual do serviço Fail2Ban e detalhes da jail do Kea DHCP.
+
             sudo systemctl status fail2ban
             echo ""
             echo "--- Jail KEA DHCP ---"
+
+            # 14.5 - Ver detalhes da jail do KEA DHCP
+            # O que faz: Exibe informações específicas sobre a jail do Kea DHCP no Fail2Ban.
+
             sudo fail2ban-client status kea-dhcp
             ;;
         5)
@@ -779,6 +799,9 @@ while true; do
             ;;
     esac
 done
+
+# 15 - Mensagem Final
+# O que faz: Exibe uma mensagem final com comandos úteis para o utilizador.
 
 echo ""
 echo "=========================================="
