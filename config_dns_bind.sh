@@ -62,7 +62,7 @@ case $OPCAO_MENU in
         sleep 0.5
 
         # 3 - Configuração da interface LAN com IP estático
-        # O que faz: Configura a interface LAN principal com o IP estático fornecido.
+        # O que faz: Configura a interface de rede principal com um IP estático fornecido pelo utilizador.
 
         echo ""
         echo "=========================================="
@@ -106,7 +106,7 @@ case $OPCAO_MENU in
             sleep 0.05
         done
 
-        # 5 - Teste de conectividade à Internet
+        # 4 - Teste de conectividade à Internet
         # O que faz: Verifica se o servidor consegue aceder à Internet antes de instalar pacotes.
         
         # O que faz o ping -c 3: Envia 3 pacotes ICMP para o servidor DNS público do Google (8.8.8.8).
@@ -124,8 +124,8 @@ case $OPCAO_MENU in
         sleep 0.5
         echo ""
 
-        # 6 - Instalação do BIND
-        # O que faz: Instala o servidor DNS BIND e as suas ferramentas de diagnóstico.
+        # 5 - Instalação do BIND
+        # O que faz: Instala o servidor DNS BIND e as ferramentas associadas.
 
         echo ""
         echo "=========================================="
@@ -143,7 +143,7 @@ case $OPCAO_MENU in
         localhost="127.0.0.1"
         sudo nmcli con mod ens224 ipv4.dns "$localhost"
 
-        # 7 - Instalação e configuração do Fail2Ban para proteger o BIND
+        # 6 - Instalação e configuração do Fail2Ban para proteger o BIND
         # O que faz: Instala o Fail2Ban e configura uma jail específica para proteger o servidor DNS contra ataques.
 
         # O que faz o Fail2Ban: Ferramenta que monitora logs e bloqueia IPs que mostram comportamento malicioso.
@@ -172,8 +172,6 @@ case $OPCAO_MENU in
         echo "=========================================="
         echo ""
 
-        # 7.1 - Instalar EPEL e Fail2Ban (Comandos Separados para Robustez)
-
         echo "A instalar EPEL..."
         sudo dnf install -y epel-release 
 
@@ -186,7 +184,7 @@ case $OPCAO_MENU in
         echo "Fail2Ban instalado com sucesso!"
         sleep 0.5
 
-        # 7.4 - Criar Jail (Regra) para o BIND DNS
+        # 6.1 - Criar Jail (Regra) para o BIND DNS
         # O que faz: Define os parâmetros de banimento para o serviço DNS.
 
         echo "A criar jail 'bind-dns' em /etc/fail2ban/jail.d/bind-dns.conf..."
@@ -207,7 +205,8 @@ ignoreip = $IP_TO_IGNORE
 action   = firewallcmd-ipset
 EOF
 
-        # 7.5 - Iniciar e habilitar o serviço Fail2Ban
+        # 6.2 - Iniciar e habilitar o serviço Fail2Ban
+        # O que faz: Ativa e inicia o serviço Fail2Ban, garantindo que ele arranca automaticamente no boot.
 
         echo "A iniciar e habilitar o serviço Fail2Ban..."
 
@@ -220,7 +219,7 @@ EOF
         echo "Fail2Ban configurado para proteger o BIND/DNS."
         sleep 0.5
 
-        # 8 - Configurar DNS da interface LAN para localhost
+        # 7 - Configurar DNS da interface LAN para localhost
         # O que faz: Define o servidor DNS da interface LAN para o próprio servidor (localhost).
         
         # O que faz o ipv4.dns: Define o servidor DNS que a interface irá usar.
@@ -243,7 +242,7 @@ EOF
         sleep 0.5
         echo ""
 
-        # 9 - Extrair octetos do IP para criar zona reversa
+        # 8 - Extrair octetos do IP para criar zona reversa
         # O que faz: Divide o endereço IP em 4 partes (octetos) para poder criar a zona de resolução inversa.
         
         # O que é zona reversa: Permite descobrir o nome de domínio a partir de um endereço IP (IP → nome).
@@ -275,7 +274,7 @@ EOF
 
         echo "A criar diretório e ficheiros de logs..."
         
-        # 9.1 - Criar diretório e ficheiros de logs do BIND
+        # 8.1 - Criar diretório e ficheiros de logs do BIND
         # O que faz: Cria o diretório e ficheiros necessários para armazenar os logs do BIND.
 
         # O que faz o mkdir -p: Cria o diretório, incluindo pais se não existirem.
@@ -305,7 +304,7 @@ EOF
         sleep 0.5
         echo ""
 
-        # 9.2 - VALIDAÇÃO CRÍTICA: Verificar se as variáveis estão definidas
+        # 8.2 - Validar variáveis necessárias
         # O que faz: Garante que todas as variáveis necessárias existem antes de criar os ficheiros de zona.
 
         echo ""
@@ -347,8 +346,9 @@ EOF
         sleep 0.5
         echo ""
 
-        # 10 - Criar ficheiro de zona direta (Forward Zone)
-        # O que faz: Cria o ficheiro que resolve nomes de domínio para endereços IP (nome → IP).
+        # 9 - Criar ficheiro de zona direta (Forward Zone)
+        # O que faz: Cria o ficheiro que resolve nomes de domínio para endereços IP (nome -> IP).
+
         # O que faz o tee: Escreve o conteúdo para um ficheiro (similar ao cat > ficheiro).
         # O que faz o >/dev/null: Redireciona a saída para "nada" (não mostra no terminal).
 
@@ -381,7 +381,7 @@ EOF
         echo "Forward zone criada: /var/named/${DOMINIO}.db"
         sleep 0.5
 
-        # 11 - Criar ficheiro de zona inversa (Reverse Zone)
+        # 10 - Criar ficheiro de zona inversa (Reverse Zone)
         # O que faz: Cria o ficheiro que resolve endereços IP para nomes de domínio (IP -> nome).
 
         echo "A criar zona inversa (Reverse Zone)..."
@@ -406,14 +406,13 @@ EOF
         sleep 0.5
         echo ""
 
-        # 12 - Configurar named.conf (ficheiro principal do BIND)
+        # 11 - Configurar named.conf (ficheiro principal do BIND)
         # O que faz: Cria o ficheiro de configuração principal do servidor BIND com todas as opções necessárias.
 
         echo ""
         echo "CONFIGURAÇÃO DO BIND"
         echo ""
 
-        # UTILIZAÇÃO de << EOF para evitar problemas com identação.
         sudo tee /etc/named.conf >/dev/null << EOF
 // named.conf do servidor autoritativo e de caching
 options {
@@ -475,9 +474,13 @@ EOF
         echo "Configuração básica do named.conf concluída."
         sleep 0.5
 
-        # 13 - Adicionar zonas personalizadas ao named.conf
+        # 12 - Adicionar zonas personalizadas ao named.conf
         # O que faz: Adiciona as definições das zonas direta e inversa ao ficheiro de configuração.
+        
         # O que faz o -a: Anexa (append) conteúdo ao ficheiro sem sobrescrever o que já existe.
+        # O que faz o if ... then ... fi: Estrutura condicional para verificar se a inclusão já existe.
+        # O que faz o grep -q: Verifica silenciosamente se uma string existe num ficheiro (sem produzir saída).
+        # O que faz o exit 1: Sai do script com código de erro 1 em caso de falha. Juntamente com o set -e no início, isso interrompe o script.
 
         echo "A adicionar zonas personalizadas ao named.conf..."
 
@@ -504,7 +507,7 @@ EOF
         echo "Zonas adicionadas com sucesso."
         sleep 0.5
 
-        # 15 - Definir permissões dos ficheiros de zona
+        # 13 - Definir permissões dos ficheiros de zona
         # O que faz: Altera o proprietário dos ficheiros de zona para o utilizador "named".
 
         # O que faz o sudo chown: Change owner - muda o proprietário dos ficheiros de zona para o utilizador e grupo "named".
@@ -518,7 +521,7 @@ EOF
         sleep 0.5
         echo ""
 
-        # 16 - Validar configuração do BIND (named.conf)
+        # 14 - Validar configuração do BIND (named.conf)
         # O que faz: Verifica se o ficheiro de configuração principal tem erros de sintaxe.
 
         # O que faz o named-checkconf: Ferramenta que valida a sintaxe do ficheiro named.conf.
@@ -542,7 +545,7 @@ EOF
 
         sleep 0.5
 
-        # 17 - Validar zona direta
+        # 15 - Validar zona direta
         # O que faz: Verifica se o ficheiro de zona direta tem erros de sintaxe ou inconsistências.
 
         # O que faz o named-checkzone: Ferramenta que valida a sintaxe e integridade de ficheiros de zona.
@@ -561,7 +564,7 @@ EOF
 
         sleep 0.5
 
-        # 18 - Validar zona inversa
+        # 16 - Validar zona inversa
         # O que faz: Verifica se o ficheiro de zona inversa tem erros de sintaxe ou inconsistências.
 
         # O que faz o ${REVERSE_ZONE_ID}: Nome da zona inversa a validar.
@@ -580,7 +583,7 @@ EOF
         sleep 0.5
         echo ""
 
-        # 19 - Configurar firewall
+        # 17 - Configurar firewall
         # O que faz: Adiciona regras à firewall para permitir tráfego DNS (porta 53 TCP/UDP).
 
         # O que faz o firewall-cmd: Ferramenta de gestão da firewall (firewalld) no CentOS/RHEL.
@@ -604,7 +607,7 @@ EOF
         sleep 0.5
         echo ""
 
-        # 20 - Iniciar e habilitar o serviço BIND
+        # 18 - Iniciar e habilitar o serviço BIND
         # O que faz: Inicia o servidor DNS BIND e configura-o para arrancar automaticamente no boot.
         
         # O que faz o systemctl enable --now: Habilita o serviço (auto-start) e inicia-o imediatamente.
@@ -639,7 +642,7 @@ EOF
 
     2)
 
-        # 21 - Menu de gestão de registos DNS
+        # 19 - Menu de gestão de registos DNS
         # O que faz: Permite ao utilizador adicionar ou consultar registos DNS após a configuração inicial.
 
         # O que faz o while true; do ... done: Cria um loop infinito para o menu.
@@ -687,7 +690,7 @@ EOF
                 SERIAL_DATE=$(date +%s)
             fi
         else
-            echo "Aviso: O ficheiro de zona direta não foi encontrado. Usando Serial Date atual."
+            echo "Aviso 19: O ficheiro de zona direta não foi encontrado. Usando Serial Date atual."
             SERIAL_DATE=$(date +%s)
         fi
         
@@ -700,7 +703,7 @@ EOF
 
         if [[ "$GERIR_REGISTOS" == "y" || "$GERIR_REGISTOS" == "Y" ]]; then
             
-            # 21.1 - Loop do menu principal
+            # 19.1 - Loop do menu principal
             # O que faz: Mantém o menu ativo até o utilizador escolher sair.
 
             while true; do
@@ -803,7 +806,7 @@ EOF
                         read -p "Último octeto do IP (ex: para 192.168.0.20, digite 20): " ULTIMO_OCTETO
                         read -p "Nome completo do host (ex: pc1.${DOMINIO}): " NOME_COMPLETO
                         
-                        # 21.1.6 - Adição do ponto final caso não exista.
+                        # 21.1.7 - Adição do ponto final caso não exista.
                         # O que faz: Garante que o FQDN (Fully Qualified Domain Name) termina com ponto.
 
                         # O que faz o =~ \.$: Verifica se a string termina com um ponto.
@@ -813,7 +816,7 @@ EOF
                             NOME_COMPLETO="${NOME_COMPLETO}."
                         fi
                         
-                        # 21.1.7 - Incrementação da serial da zona inversa (reverse zone)
+                        # 21.1.8 - Incrementação da serial da zona inversa (reverse zone)
                         # O que faz: Atualiza o número de série para que outros servidores DNS saibam que a zona mudou.
 
                         # O que faz o sed: Stream editor - ferramenta para procurar e substituir texto em ficheiros.
@@ -825,7 +828,8 @@ EOF
                         sudo sed -i "s/${SERIAL_DATE}/${NOVO_SERIAL}/" /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
                         SERIAL_DATE=$NOVO_SERIAL
                         
-                        # 21.1.8 - Adicionar o registo PTR ao ficheiro de zona inversa
+                        # 21.1.9 - Adicionar o registo PTR ao ficheiro de zona inversa
+                        # O que faz: Anexa uma nova linha ao ficheiro com o registo DNS tipo PTR.
 
                         echo "${ULTIMO_OCTETO}  IN  PTR   ${NOME_COMPLETO}" | sudo tee -a /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null
                         
@@ -833,7 +837,7 @@ EOF
                         echo "Registo inverso adicionado com sucesso!"
                         echo "  ${OCTETO_1}.${OCTETO_2}.${OCTETO_3}.${ULTIMO_OCTETO} -> ${NOME_COMPLETO}"
                         
-                        # 21.1.9 - Validar a zona inversa após alteração
+                        # 21.1.10 - Validar a zona inversa após alteração
                         # O que faz: Verifica se o ficheiro de zona inversa está correto após a adição do novo registo.
 
                         # O que faz o rndc reload: Recarrega as zonas DNS sem reiniciar o serviço BIND.
@@ -848,7 +852,7 @@ EOF
                             echo "Reverse zone recarregada com sucesso!"
 
                         else
-                            echo "Erro 21.1.9! Reverse zone inválida após alteração!"
+                            echo "Erro 21.1.10! Reverse zone inválida após alteração!"
                             echo "  A reverter alterações..."
                             sudo sed -i '$ d' /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
                         fi
@@ -857,7 +861,7 @@ EOF
                         ;;
                         
                     3)
-                        # 21.1.10 - Ver registos existentes
+                        # 21.1.11 - Ver registos existentes
                         # O que faz: Mostra os registos DNS atualmente configurados nas zonas.
 
                         # O que faz o grep -v "^;": Filtra linhas que começam com ; (comentários).
@@ -944,6 +948,7 @@ EOF
 
                         # 22.1.2 - Teste de resolução direta
                         # O que faz: Consulta o servidor DNS para resolver nomes de domínio para endereços IP.
+
                         # O que faz o dig: Ferramenta de query DNS que consulta registos DNS.
 
                         dig ${DOMINIO}
@@ -955,6 +960,7 @@ EOF
 
                         # 22.1.3 - Teste de resolução inversa
                         # O que faz: Consulta o servidor DNS para resolver endereços IP para nomes de domínio.
+
                         # O que faz o -x: Opção do dig que realiza uma query de resolução inversa (IP para nome).
 
                         dig -x ${IP_SERVIDOR_DNS}
@@ -962,13 +968,17 @@ EOF
                     3)
                         echo ""
                         echo "--- Status do Serviço BIND ---"
+                        
+                        # 22.1.4 - Ver status do serviço BIND
+                        # O que faz: Mostra o estado atual do serviço BIND (named).
+
                         sudo systemctl status named
                         ;;
                     4)
                         echo ""
                         echo "--- Teste de Conectividade Internet ---"
 
-                        # 22.1.4 - Teste de conectividade à Internet via DNS
+                        # 22.1.5 - Teste de conectividade à Internet via DNS
                         # O que faz: Testa se o forwarder 8.8.8.8 está a funcionar corretamente.
 
                         dig google.com
@@ -977,7 +987,7 @@ EOF
                         echo ""
                         echo "A sair sem verificações."
 
-                        # 22.1.5 - Sair do menu de verificações
+                        # 22.1.6 - Sair do menu de verificações
                         # O que faz: Encerra o loop do menu de verificações.
 
                         break
@@ -986,7 +996,7 @@ EOF
                         echo ""
                         echo "Opção inválida. A sair sem verificações."
 
-                        # 22.1.6 - Opção inválida
+                        # 22.1.7 - Opção inválida
                         # O que faz: Encerra o loop do menu de verificações em caso de entrada inválida.
 
                         break
