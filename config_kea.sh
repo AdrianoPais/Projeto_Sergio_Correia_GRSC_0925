@@ -295,8 +295,10 @@ echo ""
 echo "Configuração de Interfaces"
 echo ""
 
-nmcli device status | grep ethernet
+nmcli 
+
 echo ""
+
 read -p "Qual é a interface WAN (NAT)? " WAN_IF
 read -p "Qual é a interface LAN (para DHCP)? " LAN_IF
 
@@ -576,7 +578,45 @@ if ! sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf; then
     sleep 0.5
 fi
 
-# 8 - Configuração do Fail2Ban para o KEA DHCP
+# 8 - Configuração do Fail2Ban para o Kea DHCPv4
+# O que faz: Configura o Fail2Ban para monitorizar os logs do Kea DHCPv4 e bloquear IPs que apresentem comportamento suspeito, como múltiplas tentativas de DHCPDISCOVER.
+
+echo ""
+echo "A configurar regras de proteção..."
+
+# 8.1 - Criação do ficheiro de filtro KEA DHCP (kea-dhcp.conf) para logs JSON
+# O que faz: Cria um ficheiro de filtro personalizado para o Fail2Ban, permitindo-lhe analisar os logs JSON do Kea DHCPv4 e identificar padrões de comportamento suspeito.
+
+# O que faz o sudo tee /etc/fail2ban/filter.d/kea-dhcp.conf: Cria um ficheiro de filtro personalizado para o Kea DHCP dentro do diretório de filtros do Fail2Ban.
+# O que faz o failregex: Define os padrões de expressão regular que o Fail2Ban irá procurar nos logs para identificar tentativas suspeitas.
+# O que faz o ignoreregex: Define padrões de expressão regular que o Fail2Ban
+# irá ignorar nos logs.
+# O que faz o datepattern: Define o padrão de data que corresponde ao formato JSON do
+# Kea, essencial para o findtime funcionar corretamente.
+
+sudo tee /etc/fail2ban/filter.d/kea-dhcp.conf >/dev/null << 'EOF'
+# ============================================================================ #
+# FILTRO FAIL2BAN PARA KEA DHCP (JSON)
+# ============================================================================ #
+
+[Definition]
+
+# Usa ADDR para capturar o IP do cliente (quando presente) ou outro identificador.
+# Corresponde a logs como: {"message":"DHCPDISCOVER from 00:00:00:00:00:00 via eth0"}
+failregex = ^.*"message":\s*"DHCPDISCOVER from (?:<ADDR>|\S+) via \S+".*$
+            ^.*"message":\s*"DHCPREQUEST .*from (?:<ADDR>|\S+) via \S+".*$
+
+ignoreregex =
+
+[Init]
+# Padrão de data que corresponde ao formato JSON do KEA, essencial para o findtime funcionar.
+datepattern = ^"timestamp":\s*"%%Y-%%m-%%d\s+%%H:%%M:%%S\.%%f"
+EOF
+
+echo "Ficheiro de filtro /etc/fail2ban/filter.d/kea-dhcp.conf criado."
+sleep 0.5
+
+# 8.1 - Configuração do Fail2Ban para o KEA DHCP
 # O que faz: Cria uma configuração personalizada do Fail2Ban para monitorizar os logs do Kea DHCPv4 e bloquear IPs que apresentem comportamento suspeito, como múltiplas tentativas de DHCPDISCOVER.
 
 # O que faz o sudo tee /etc/fail2ban/jail.d/kea-dhcp.conf: Cria um ficheiro de configuração específico para o Kea DHCP dentro do diretório de jails do Fail2Ban.
@@ -602,12 +642,16 @@ sudo tee /etc/fail2ban/jail.d/kea-dhcp.conf >/dev/null << EOF
 # Ativar esta jail
 enabled  = true
 
+filter   = kea-dhcp
+
 # Portas usadas pelo DHCP
 port     = 67,68
 protocol = udp
 
 # Onde procurar os logs do KEA
 logpath  = /var/log/kea/kea-dhcp4.log
+# Backend para o Kea que usa logs JSON. 'polling' é o mais seguro.
+backend  = polling
 
 # Regras de bloqueio:
 maxretry = 20       # Após 20 tentativas suspeitas...
@@ -620,14 +664,14 @@ ignoreip = 127.0.0.1/8 ${IP_SERVIDOR}
 # Como bloquear (usar a firewall do sistema)
 action   = firewallcmd-ipset
 
-# O que procurar nos logs (padrão simples: múltiplos DHCPDISCOVER)
-failregex = .*DHCPDISCOVER from .* via .*
 EOF
 
 echo "Configuração criada: /etc/fail2ban/jail.d/kea-dhcp.conf"
 sleep 0.5
 
-# Passo 4: Iniciar o Fail2Ban
+# 8.1 - Iniciar o Fail2Ban
+# O que faz: Ativa e inicia o serviço Fail2Ban, garantindo que ele arranca automaticamente no boot.
+
 echo ""
 echo "A iniciar o Fail2Ban..."
 
