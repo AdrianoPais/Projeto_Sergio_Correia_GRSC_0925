@@ -274,7 +274,23 @@ EOF
         echo ""
 
         echo "A criar diretório e ficheiros de logs..."
+        
+        # 9.1 - Criar diretório e ficheiros de logs do BIND
+        # O que faz: Cria o diretório e ficheiros necessários para armazenar os logs do BIND.
 
+        # O que faz o mkdir -p: Cria o diretório, incluindo pais se não existirem.
+        # O que faz o chown named:named: Define o proprietário e grupo dos ficheiros para "named" (utilizador do BIND).
+        # O que faz o chmod 755: Define permissões de leitura, escrita e execução para o proprietário, e leitura e execução para grupo e outros.
+        # O que faz o touch: Cria ficheiros vazios se não existirem.
+        # O que faz o restorecon -Rv: Restaura os contextos SELinux recursivamente para o diretório especificado.
+        # O que faz o -R: Aplica a ação recursivamente a todos os ficheiros e subdiretórios.
+        # O que faz o -v: Modo verbose - mostra detalhes das ações realizadas.
+        # O que faz o /var/log/named: Diretório padrão onde o BIND armazena seus logs.
+        # O que faz o bind_queries.log: Ficheiro de log para consultas DNS.
+        # O que faz o security.log: Ficheiro de log para eventos de segurança do BIND.
+        # O que faz o SELinux: Mecanismo de segurança que controla acessos a ficheiros e processos no sistema.
+        # O que faz o contexto SELinux: Define as permissões de segurança para ficheiros e processos.
+        
         sudo mkdir -p /var/log/named
         sudo chown named:named /var/log/named
         sudo chmod 755 /var/log/named
@@ -289,7 +305,7 @@ EOF
         sleep 0.5
         echo ""
 
-        # 9.5 - VALIDAÇÃO CRÍTICA: Verificar se as variáveis estão definidas
+        # 9.2 - VALIDAÇÃO CRÍTICA: Verificar se as variáveis estão definidas
         # O que faz: Garante que todas as variáveis necessárias existem antes de criar os ficheiros de zona.
 
         echo ""
@@ -590,6 +606,7 @@ EOF
 
         # 20 - Iniciar e habilitar o serviço BIND
         # O que faz: Inicia o servidor DNS BIND e configura-o para arrancar automaticamente no boot.
+        
         # O que faz o systemctl enable --now: Habilita o serviço (auto-start) e inicia-o imediatamente.
         # O que faz o named: Nome do serviço BIND no systemd.
         # O que faz o systemctl status: Mostra o estado atual do serviço (ativo, inativo, erros).
@@ -602,9 +619,11 @@ EOF
 
         echo -n "A iniciar o Serviço BIND..."
         for i in {1..50}; do
-            printf "\rA carregar: [%-50s]" "$(printf '=%.0s' $(seq 1 $i))"
+            printf "\rA carregar: [%-50s]" "$(printf ' =%.0s ' $(seq 1 $i))"
             sleep 0.1
         done
+
+        echo ""
 
         sudo systemctl enable --now named
 
