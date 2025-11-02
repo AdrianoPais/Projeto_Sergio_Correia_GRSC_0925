@@ -46,6 +46,7 @@ sudo dnf install -y kea
 
 # 2 - Criação do backup config
 # O que faz: Cria uma cópia de segurança do ficheiro de configuração original do KEA DHCP4, caso este exista e ainda não tenha sido feito um backup.
+
 # O que faz o -f: Verifica se o ficheiro especificado existe. - file
 # O que faz o -e: Verifica se o ficheiro ou diretório especificado existe (usado aqui para garantir que o backup não seja sobrescrito). - Exists
 
@@ -56,13 +57,14 @@ if [ -f /etc/kea/kea-dhcp4.conf ] && [ ! -e /etc/kea/kea-dhcp4.conf.backup ]; th
 fi
 
 # 3 - Validação do IP da Máquina
-# Verifica se o IP pertence à Classe C (192.168.x.x). Depois, garante que o terceiro octeto do IP não é 0 nem 255.
+# O que faz: Verifica se o IP pertence à Classe C (192.168.x.x). Depois, garante que o terceiro octeto do IP não é 0 nem 255.
 
 while true; do
 
 	# 3.1 - Validação da Classe C
 	# O que faz: Verifica se o IP do servidor pertence à Classe C (192.168.x.x) e se os octetos estão dentro dos intervalos válidos (1-254).
-	# O que faz o =~: Operador de correspondência de expressão regular em bash, usado para validar o formato do IP. Como funciona: Verifica se a variável à esquerda corresponde ao padrão regex à direita.
+	
+    # O que faz o =~: Operador de correspondência de expressão regular em bash, usado para validar o formato do IP. Como funciona: Verifica se a variável à esquerda corresponde ao padrão regex à direita.
 	# O que faz o ^: Indica o início da string.
 	# O que faz o $: Indica o fim da string.
 	# O que faz o \.: Escapa o ponto, que é um caractere especial em regex, para que seja interpretado literalmente.
@@ -136,6 +138,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
 
     # 4.6 - Validação do Range DHCP
     # O que faz: Garante que o início do range DHCP é menor que o fim e que o IP do servidor não está dentro do range DHCP.
+    
     # O que faz o >=: Operador de comparação em bash, usado para verificar se um valor é maior ou igual a outro.
 
     # Validação 1: Início do range deve ser menor que o fim
@@ -155,6 +158,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     fi
 
     # Validação 3: IP do Gateway não pode estar dentro do range DHCP (Recomendação de segurança/padrão)
+    # O que faz: Garante que o 4º octeto do gateway não esteja dentro do range DHCP definido.
 
     if (( OCTETO_IP_GATEWAY >= OCTETO_INICIO_RANGE && OCTETO_IP_GATEWAY <= OCTETO_FIM_RANGE )); then
         echo "Erro 8! O 4º octeto do Gateway ($OCTETO_IP_GATEWAY) não deve estar dentro do range DHCP."
@@ -205,11 +209,11 @@ echo -n "[ "
 
 for i in {1..40}; do
 	echo -n "="
-	sleep 0.1
+	sleep 0.05
 done
 
 echo " ]"
-echo "Feito!"
+echo " Feito!"
 
 # 5 - Configuração do Acesso à Internet
 # O que faz: Pergunta ao utilizador se os clientes DHCP devem ter acesso à Internet. Se sim, configura o gateway e os servidores DNS apropriados.
@@ -288,7 +292,7 @@ fi
 # O que difere de DHCP tradicional: Nada nesta secção difere do DHCP tradicional, pois a configuração da interface de rede é independente do serviço DHCP utilizado.
 
 echo ""
-echo "=== Configuração de Interfaces ==="
+echo "Configuração de Interfaces"
 echo ""
 
 nmcli device status | grep ethernet
