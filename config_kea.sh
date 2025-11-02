@@ -658,7 +658,7 @@ EOF
 echo "Configuração criada: /etc/fail2ban/jail.d/kea-dhcp.conf"
 sleep 0.5
 
-# 8.1 - Iniciar o Fail2Ban
+# 8.2 - Iniciar o Fail2Ban
 # O que faz: Ativa e inicia o serviço Fail2Ban, garantindo que ele arranca automaticamente no boot.
 
 echo ""

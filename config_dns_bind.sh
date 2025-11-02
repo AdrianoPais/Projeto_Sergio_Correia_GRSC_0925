@@ -619,7 +619,7 @@ EOF
 
         echo -n "A iniciar o Serviço BIND..."
         for i in {1..50}; do
-            printf "\rA carregar: [%-50s]" "$(printf ' =%.0s ' $(seq 1 $i))"
+            printf "\rA carregar: [ %-50s ]" "$(printf '=%.0s ' $(seq 1 $i))"
             sleep 0.1
         done
 
