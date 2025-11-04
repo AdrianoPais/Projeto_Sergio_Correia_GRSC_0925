@@ -13,7 +13,7 @@
 
 # O que faz o dos2unix *.sh: Converte todos os ficheiros de script shell (.sh) no diretório atual do formato DOS/Windows para o formato Unix/Linux.
 
-dos2unix *.sh
+dos2unix ./*.sh
 
 # O que faz o set -e: Configura o script para sair imediatamente se qualquer comando retornar um código de erro diferente de zero, garantindo que erros são tratados imediatamente.
 
