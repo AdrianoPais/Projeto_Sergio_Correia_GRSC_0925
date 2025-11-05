@@ -77,13 +77,13 @@ while true; do
 	QUARTO_OCTETO=$(echo "$IP_SERVIDOR" | cut -d'.' -f4)
 
 	if [[ ! $IP_SERVIDOR =~ ^192\.168\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-		echo "Erro 1! IP deve começar com 192.168.x.x."
+		echo "Erro 3.1! IP deve começar com 192.168.x.x."
 
 	elif (( TERCEIRO_OCTETO < 0 || TERCEIRO_OCTETO > 254 )); then
-		echo "Erro 2! O 3º octeto deve estar entre 1 e 254."
+		echo "Erro 3.2! O 3º octeto deve estar entre 1 e 254."
 
 	elif (( QUARTO_OCTETO < 2 || QUARTO_OCTETO >= 254 )); then
-		echo "Erro 3! O 4º octeto deve estar entre 2 e 253."
+		echo "Erro 3.3! O 4º octeto deve estar entre 2 e 253."
 
 	else
 		echo "IP válido!"
@@ -111,7 +111,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     read -p "Qual vai ser o fim do range DHCP (4º octeto)? " OCTETO_FIM_RANGE
     read -p "Inserir o nome do domínio (ex: empresa.local): " DOMAIN_NAME
     read -p "Inserir o IP do Servidor DNS BIND (o IP estático na LAN Segment): " IP_DNS_BIND
-
+    echo ""
     # 4.2 - Extrair a subrede do servidor
 	# O que faz: Usa o cut para extrair os primeiros três octetos do IP do servidor, formando a sub-rede.
 	
@@ -143,7 +143,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     # O que faz o >=: Operador de comparação em bash, usado para verificar se um valor é maior ou igual a outro.
 
     if (( OCTETO_INICIO_RANGE >= OCTETO_FIM_RANGE )); then
-        echo "Erro 6! Início do range ($OCTETO_INICIO_RANGE) deve ser menor que o fim ($OCTETO_FIM_RANGE)."
+        echo "Erro 4.6! Início do range ($OCTETO_INICIO_RANGE) deve ser menor que o fim ($OCTETO_FIM_RANGE)."
         continue
     fi
 
@@ -153,15 +153,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     QUARTO_OCTETO_SERVIDOR=$(echo "$IP_SERVIDOR" | cut -d'.' -f4)
 
     if (( QUARTO_OCTETO_SERVIDOR >= OCTETO_INICIO_RANGE && QUARTO_OCTETO_SERVIDOR <= OCTETO_FIM_RANGE )); then
-        echo "Erro 7! O 4º octeto do Servidor ($QUARTO_OCTETO_SERVIDOR) não pode estar dentro do range DHCP ($OCTETO_INICIO_RANGE - $OCTETO_FIM_RANGE)."
-        continue
-    fi
-
-    # 4.8 - Validação 3: IP do DNS não pode estar dentro do range DHCP
-    # O que faz: Garante que o 4º octeto do IP do DNS não esteja dentro do range DHCP definido.
-
-    if (( OCTETO_IP_GATEWAY >= OCTETO_INICIO_RANGE && OCTETO_IP_GATEWAY <= OCTETO_FIM_RANGE )); then
-        echo "Erro 8! O 4º octeto do Gateway ($OCTETO_IP_GATEWAY) não deve estar dentro do range DHCP."
+        echo "Erro 4.7! O 4º octeto do Servidor ($QUARTO_OCTETO_SERVIDOR) não pode estar dentro do range DHCP ($OCTETO_INICIO_RANGE - $OCTETO_FIM_RANGE)."
         continue
     fi
 
@@ -189,7 +181,8 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     echo "IP de Rede:           $IP_REDE"
     echo "Domain Name:         $DOMAIN_NAME"
     echo "---------------------------------------------------------"
-
+    echo ""
+    
     # 4.10 - Solicitar confirmação final
     # O que faz: Pede ao utilizador para confirmar se todos os valores estão corretos antes de prosseguir.
 
@@ -200,6 +193,7 @@ done
 echo "Verificação concluída!"
 
 echo "Aguarde enquanto aplicamos as definições!"
+echo ""
 
 # Extra - Barra de Progresso para a espera da aplicação nova das configurações
 # O que faz o -n do echo: Impede o echo de adicionar uma nova linha após a saída, permitindo que a barra de progresso seja exibida na mesma linha.
