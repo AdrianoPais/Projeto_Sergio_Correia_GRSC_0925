@@ -182,7 +182,7 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     echo "Domain Name:         $DOMAIN_NAME"
     echo "---------------------------------------------------------"
     echo ""
-    
+
     # 4.10 - Solicitar confirmação final
     # O que faz: Pede ao utilizador para confirmar se todos os valores estão corretos antes de prosseguir.
 
@@ -208,6 +208,7 @@ for i in {1..40}; do
 done
 
 echo " ]"
+echo ""
 echo "Feito!"
 
 # 5 - Configuração do Acesso à Internet
@@ -562,16 +563,18 @@ fi
 # 8.1 - Permissões dos Ficheiros de Configuração e Log do Kea DHCPv4
 # O que faz: Define as permissões corretas para o ficheiro de configuração do Kea DHCPv4 e o ficheiro de log, garantindo que apenas o utilizador root tenha acesso de escrita.
 
+# O que faz o -t: Testa a configuração do ficheiro antes de iniciar o serviço.
+
 sudo chmod 644 /etc/kea/kea-dhcp4.conf
 sudo chown root:root /etc/kea/kea-dhcp4.conf
 
-sudo touch /var/log/kea-dhcp4.log
-sudo chmod 644 /var/log/kea-dhcp4.log
-sudo chown root:root /var/log/kea-dhcp4.log
+sudo touch /var/log/kea/kea-dhcp4.log
+sudo chmod 644 /var/log/kea/kea-dhcp4.log
+sudo chown root:root /var/log/kea/kea-dhcp4.log
 
 echo "A validar as configurações do Kea DHCP4..."
 if ! sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf; then
-    echo "Erro: Configuração inválida detetada. Por favor, reveja o ficheiro de configuração."
+    echo "Erro 8.1: Configuração inválida detetada. Por favor, reveja o ficheiro de configuração."
     exit 1
     sleep 0.5
 fi
