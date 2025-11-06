@@ -147,7 +147,7 @@ case $OPCAO_MENU in
         sleep 0.5
 
         localhost="127.0.0.1"
-        sudo nmcli con mod ens224 ipv4.dns "$localhost"
+        sudo nmcli con mod $LAN_INTERFACE ipv4.dns "$localhost"
 
         # 6 - Instalação e configuração do Fail2Ban para proteger o BIND
         # O que faz: Instala o Fail2Ban e configura uma jail específica para proteger o servidor DNS contra ataques.
