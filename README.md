@@ -22,6 +22,7 @@ Duas interfaces de rede (servidor DHCP atuando como Gateway/NAT).
 
 Deve-se executar os scripts pela ordem apresentada abaixo. Ambos param automaticamente caso seja detetado um erro crítico.
 
+
 ## Fase 1 — Configuração do Servidor DNS (BIND)
 
 O script config_dns.sh instala e configura o BIND, cria as zonas direta e inversa e ajusta a firewall para permitir tráfego DNS.
@@ -46,7 +47,8 @@ Servidor a resolver nomes internos e externos
 
 Firewall configurada para permitir DNS (porta 53)
 
-Fase 2 — Configuração do Servidor DHCP (KEA) + NAT
+
+## Fase 2 — Configuração do Servidor DHCP (KEA) + NAT
 
 O script config_kea.sh configura o Kea DHCP para distribuir endereços IP e ativa o encaminhamento / tradução de endereços se o servidor atuar como Gateway.
 
