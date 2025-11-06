@@ -51,7 +51,7 @@ sudo dnf install -y kea
 
 # O que difere de DHCP tradicional (dhcpd): O ficheiro de configuração do KEA DHCP4 é diferente do dhcpd, por isso o caminho do ficheiro também é diferente.
 
-if [ -f /etc/kea/kea-dhcp4.conf ] && [ ! -e /etc/kea/kea-dhcp4.conf.backup ]; then
+if [ -f /etc/kea/kea-dhcp4.conf ] || [ ! -e /etc/kea/kea-dhcp4.conf.backup ]; then
 	sudo cp /etc/kea/kea-dhcp4.conf /etc/kea/kea-dhcp4.conf.backup
 fi
 
