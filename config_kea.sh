@@ -100,7 +100,7 @@ done
 
 VERIFICACAO=""
 
-while [ "$VERIFICACAO" != "y" ] || [ "$VERIFICACAO" != "Y" ]; do
+while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
 
     # 4.1 - Solicitar o escopo de IPs desejado e gateway/DNS
     # O que faz: Pede ao utilizador apenas o 4º octeto do range, gateway e DNS, para formar os IPs completos
@@ -810,6 +810,7 @@ echo "- Status KEA: systemctl status kea-dhcp4"
 echo "- Status Fail2Ban: sudo fail2ban-client status kea-dhcp"
 echo "- Ver IPs banidos: sudo fail2ban-client status kea-dhcp"
 echo "- Desbanir IP: sudo fail2ban-client set kea-dhcp unbanip <IP>"
+echo "- Verificação de escuta : ss -lun | grep 67"
 echo ""
 echo "Recomenda-se um reboot do sistema para garantir que todas as alterações tenham efeito."
 echo "Para reiniciar o sistema, execute: reboot"
