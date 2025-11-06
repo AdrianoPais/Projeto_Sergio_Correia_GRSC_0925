@@ -75,25 +75,25 @@ NAT e routing configurados (caso o servidor seja Gateway)
 Firewall ajustada para DHCP e tráfego WAN
 
 ## Testes de Verificação
-Validação do DNS (BIND)
+- Validação do DNS (BIND)
 
-Confirmar que o serviço está ativo
+- Confirmar que o serviço está ativo
 
-Testar resolução interna (nomes da rede)
+- Testar resolução interna (nomes da rede)
 
-Testar resolução externa (com forwarders)
+- Testar resolução externa (com forwarders)
 
-Verificar logs para confirmar consultas DNS
+- Verificar logs para confirmar consultas DNS
 
-Validação do DHCP (KEA)
+- Validação do DHCP (KEA)
 
-Confirmar que o serviço está ativo
+- Confirmar que o serviço está ativo
 
-Verificar ficheiro de leases para confirmar atribuição de IPs
+- Verificar ficheiro de leases para confirmar atribuição de IPs
 
-Testar cliente Linux/Windows para receber IP automaticamente
+- Testar cliente Linux/Windows para receber IP automaticamente
 
-Confirmar que gateway e DNS recebidos correspondem aos definidos no servidor
+### Confirmar que gateway e DNS recebidos correspondem aos definidos no servidor
 
 Segurança e Operacionalidade
 
