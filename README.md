@@ -1,111 +1,108 @@
-Projeto: Servidor DNS (BIND) e DHCP (KEA) - Classe C
+# Projeto: Servidor DNS (BIND) e DHCP (KEA) - Classe C
 
-Este projeto inclui dois scripts BASH (config_dns.sh e config_kea.sh) para automatizar a instalação e configuração de serviços essenciais de rede (DNS e DHCP) em máquinas virtuais CentOS Stream 10.
+Este projeto inclui dois scripts Bash (config_dns.sh e config_kea.sh) que automatizam a instalação e configuração de dois serviços essenciais de rede: DNS (BIND) e DHCP (KEA) em máquinas CentOS Stream 10. A arquitetura assume uma rede Classe C (/24), onde o servidor KEA também pode atuar como Gateway/NAT para garantir saída para a Internet.
 
-A arquitetura assume uma rede de Classe C (/24), onde o servidor KEA também atua como Gateway/NAT.
+## Requisitos e Preparação
 
-Requisitos e Preparação
+Antes de iniciar, é necessário garantir:
 
-Antes de começar, certifique-se de que está a usar o CentOS Stream 10 e de que tem privilégios sudo.
+Sistema operativo CentOS Stream 10 instalado e atualizado.
 
-    Necessário: Os scripts esperam que a máquina tenha pelo menos duas interfaces de rede (ou uma interface única, dependendo da configuração final do config_dns.sh).
+Permissões sudo para executar os scripts.
 
-    Limpeza: Garanta que o pacote dos2unix está instalado (sudo dnf install dos2unix).
+O pacote dos2unix instalado (necessário para evitar erros de formatação).
 
-Guia de Execução
+As máquinas podem ter:
 
-Execute os scripts pela ordem abaixo. O set -e garante que o script para se houver algum erro de instalação.
+Uma interface de rede (servidor DNS isolado com LAN Segment), ou
 
-Fase 1: Configuração do Servidor DNS (BIND)
+Duas interfaces de rede (servidor DHCP atuando como Gateway/NAT).
 
-O script config_dns.sh cria o servidor BIND, configura as zonas localmente e prepara a máquina para usar o seu próprio DNS.
+## Guia de Execução
 
-    Executar:
-    Bash
+Deve-se executar os scripts pela ordem apresentada abaixo. Ambos param automaticamente caso seja detetado um erro crítico.
 
-    ./config_dns.sh
+## Fase 1 — Configuração do Servidor DNS (BIND)
 
-    Entrada de Dados: Será solicitado:
+O script config_dns.sh instala e configura o BIND, cria as zonas direta e inversa e ajusta a firewall para permitir tráfego DNS.
 
-        O Domínio (e.g., empresa.local).
+Durante a execução serão solicitados:
 
-        O IP Estático do servidor DNS.
+Nome de domínio (ex.: empresa.local)
 
-        O Gateway (IP do router ou do servidor DHCP/NAT).
+IP estático do servidor DNS
 
-        O nome da Interface de Rede (ex: ens192).
+Gateway da rede
 
-    Resultado Esperado: O BIND é instalado, as zonas são criadas e validadas, e a Firewall permite o tráfego DNS (porta 53).
+Interface de rede principal (ex.: ens192)
 
-Fase 2: Configuração do Servidor DHCP (KEA) e NAT
+### Resultado esperado:
 
-O script config_kea.sh configura o servidor KEA para distribuir IPs e define as regras de roteamento (NAT) para acesso à Internet, assumindo que este servidor é o Gateway.
+BIND instalado e ativo
 
-    Executar:
-    Bash
+Zonas criadas e validadas
 
-    ./config_kea.sh
+Servidor a resolver nomes internos e externos
 
-    Entrada de Dados: Será solicitado:
+Firewall configurada para permitir DNS (porta 53)
 
-        IP Estático do Servidor (o seu IP de LAN).
+Fase 2 — Configuração do Servidor DHCP (KEA) + NAT
 
-        Range DHCP (início e fim do 4º octeto).
+O script config_kea.sh configura o Kea DHCP para distribuir endereços IP e ativa o encaminhamento / tradução de endereços se o servidor atuar como Gateway.
 
-        IP DNS BIND (o mesmo IP que definiu na Fase 1, 192.168.1.10, ou outro servidor DNS na LAN).
+Durante a execução serão solicitados:
 
-        Nomes das interfaces WAN e LAN.
+IP estático do servidor (na LAN)
 
-        DNS Externo (8.8.8.8 ou 1.1.1.1) para o servidor/Gateway.
+Intervalo de distribuição do DHCP (range)
 
-    Resultado Esperado: O Kea é configurado, o Roteamento/NAT é ativado e a Firewall é ajustada para DHCP.
+IP do servidor DNS interno (o configurado na fase anterior)
 
-Verificação e Testes Finais
+Interface da LAN e interface da WAN
 
-Use os comandos abaixo para confirmar que os serviços estão a funcionar e seguros.
+DNS externo (ex.: 8.8.8.8)
 
-I. Testes de Validação do DNS (no Servidor BIND)
+### Resultado esperado:
 
-    Status do Serviço:
-    Bash
+Servidor DHCP ativo e funcional
 
-sudo systemctl status named
+Distribuição automática de IPs, máscara, gateway e DNS aos clientes
 
-Resolução de Domínios Internos:
-Bash
+NAT e routing configurados (caso o servidor seja Gateway)
 
-dig empresa.local
+Firewall ajustada para DHCP e tráfego WAN
 
-Resolução Externa (via Forwarder):
-Bash
+## Testes de Verificação
+Validação do DNS (BIND)
 
-dig www.google.com
+Confirmar que o serviço está ativo
 
-Verificar Logs:
-Bash
+Testar resolução interna (nomes da rede)
 
-    tail -f /var/log/named/bind_queries.log
+Testar resolução externa (com forwarders)
 
-II. Testes de Validação do DHCP (no Servidor KEA)
+Verificar logs para confirmar consultas DNS
 
-    Status do Serviço:
-    Bash
+Validação do DHCP (KEA)
 
-sudo systemctl status kea-dhcp4
+Confirmar que o serviço está ativo
 
-Ver Leases Atribuídos (IPs entregues):
-Bash
+Verificar ficheiro de leases para confirmar atribuição de IPs
 
-    cat /var/lib/kea/kea-leases4.csv
+Testar cliente Linux/Windows para receber IP automaticamente
 
-    Teste num Cliente: Num cliente Linux/Windows, use o comando para obter um IP automaticamente (e.g., dhclient no Linux) e verifique se o Gateway e o DNS recebidos são os IPs estáticos que definiu.
+Confirmar que gateway e DNS recebidos correspondem aos definidos no servidor
 
 Segurança e Operacionalidade
 
-    IPs Estáticos: O KEA garante que o Servidor, o DNS e o Gateway estão fora do pool de IPs distribuídos dinamicamente.
+O servidor reserva os IPs estáticos do DNS e do Gateway fora do range DHCP.
 
-    Segurança: A Firewall (Firewalld) está configurada em ambos os servidores, permitindo apenas tráfego essencial (DNS: porta 53, DHCP: porta 67) e o NAT está funcional.
+A firewall está configurada para permitir apenas tráfego essencial:
 
-    Persistência: As configurações de rede e as regras de NAT/Firewall são salvas para sobreviverem ao reboot.
+DNS: porta 53
 
-    Recomendação: É altamente recomendado que se configure o Fail2Ban no servidor DNS (BIND) para proteção contra ataques de negação de serviço (DDoS/DNS Amplification).
+DHCP: porta 67/UDP
+
+As regras de firewall e NAT são persistentes após reinício.
+
+### Recomendação adicional: Instalar e configurar Fail2ban no servidor BIND para aumentar a proteção contra ataques e abuso de resolução.
