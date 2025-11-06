@@ -56,7 +56,9 @@ case $OPCAO_MENU in
         read -p "Introduza o IP do Servidor DHCP/NAT: " IP_FORWARDER
         sleep 0.5
 
+        echo ""
         nmcli device status | grep ethernet
+        echo ""
 
         read -p "Indique a interface PRINCIPAL ÚNICA (ex: ens224): " LAN_INTERFACE # INTERFACE ÚNICA
         sleep 0.5
@@ -119,8 +121,8 @@ case $OPCAO_MENU in
         echo ""
         echo "Teste de conectividade antes da instalação."
 
-        nmcli con mod ens224 ipv4.dns "8.8.8.8"
-        nmcli con up ens224 
+        nmcli con mod $LAN_INTERFACE ipv4.dns "1.1.1.1"
+        nmcli con up $LAN_INTERFACE 
 
         ping -c 3 8.8.8.8
 
@@ -366,7 +368,7 @@ EOF
         1800            ; Retry
         604800          ; Expire
         86400 )         ; Minimum TTL
-    IN NS     ns.${DOMINIO}.
+@ IN NS     ns.${DOMINIO}.
 ns IN A       ${IP_SERVIDOR_DNS}
 @ IN A       ${IP_SERVIDOR_DNS}
 EOF
@@ -626,7 +628,7 @@ EOF
 
         echo -n "A iniciar o Serviço BIND..."
         for i in {1..50}; do
-            printf "\rA carregar: [ %-50s ]" "$(printf '=%.0s ' $(seq 1 $i))"
+            printf "\rA carregar: [%-50s]" "$(printf '=%.0s ' $(seq 1 $i))"
             sleep 0.1
         done
 
@@ -639,7 +641,7 @@ EOF
         sudo systemctl status named
 
         echo ""
-        echo "DNS CONFIGURADO COM SUCESSO!"
+        echo "DNS configurado com sucesso!"
         echo ""
         sleep 0.5
         ;;
@@ -672,6 +674,8 @@ EOF
 
         read -p "Introduza o IP do Servidor DNS (ex: 192.168.0.10): " IP_SERVIDOR_DNS
         read -p "Introduza o domínio (ex: empresa.local): " DOMINIO
+        DOMINIO=$(echo "$DOMINIO" | sed 's/\.$//')
+        export DOMINIO
 
         # O que faz: Re-extrair octetos e rede para uso nos passos 21 e 22
 
@@ -726,14 +730,23 @@ EOF
                 
                 case $OPCAO_GESTAO in
                     1)
+                        # 21.1 - Domain Control
+
+                        if [[ -z "$DOMINIO" ]]; then
+                            echo "O domínio não está definido. Introduza novamente:"
+                            read -rp "Domínio: " DOMINIO
+                            DOMINIO=$(echo "$DOMINIO" | sed 's/\.$//')
+                            export DOMINIO
+                        fi
+
                         # 21.1.1 - Adicionar registo à zona direta (A Record)
                         # O que faz: Adiciona um novo nome de host que aponta para um IP.
                         
                         echo ""
                         echo "--- Adicionar Nome para IP (zona direta) ---"
                         echo ""
-                        read -p "Nome do host (ex: pc1, servidor, router): " NOME_HOST
-                        read -p "Endereço IP (ex: 192.168.1.20): " IP_HOST
+                        read -r -p "Nome do host (ex: pc1): " NOME_HOST
+                        read -r -p "Endereço IP (ex: 192.168.0.20): " IP_HOST
                         
                         # 21.1.2 - Validar se o IP está na mesma rede
                         # O que faz: Extrai os primeiros 3 octetos do IP fornecido e compara com o IP do servidor.
@@ -750,24 +763,41 @@ EOF
                                 continue
                             fi
                         fi
-                        
-                        # 21.1.3 - Incrementar o serial da zona
-                        # O que faz: Atualiza o número de série para que outros servidores DNS saibam que a zona mudou.
 
-                        # O que faz o sed: Stream editor - ferramenta para procurar e substituir texto em ficheiros.
-                        # O que faz o -i: Edita o ficheiro diretamente (in-place).
-                        # O que faz o "s/ANTIGO/NOVO/": Substitui a primeira ocorrência de ANTIGO por NOVO.
-
-                        NOVO_SERIAL=$(date +%s)
-
-                        sudo sed -i "s/${SERIAL_DATE}/${NOVO_SERIAL}/" /var/named/${DOMINIO}.db
-                        SERIAL_DATE=$NOVO_SERIAL
-                        
                         # 21.1.4 - Adicionar o registo A ao ficheiro de zona
-                        # O que faz: Anexa uma nova linha ao ficheiro com o registo DNS tipo A.
+                        # O que faz: Anexa uma nova linha ao ficheiro com formatação segura.
 
-                        echo "${NOME_HOST}  IN  A       ${IP_HOST}" | sudo tee -a /var/named/${DOMINIO}.db >/dev/null
+                        # 21.1.4.1 - Escreve a linha corretamente (sem espaços invisíveis)
+                        # O que faz: Adiciona um novo registo DNS tipo A ao ficheiro de zona, formatado corretamente com alinhamento.
+
+                        # O que faz o printf: Formata e imprime texto com controlo preciso sobre espaçamento e alinhamento (mais confiável que echo).
+                        # O que faz o %-20s: Formata a primeira string (nome do host) alinhada à esquerda com largura mínima de 20 caracteres, preenchendo com espaços à direita.
+                        # O que faz o IN      A: Campos fixos do registo DNS (classe IN e tipo A), com espaçamento padronizado para legibilidade.
+                        # O que faz o %s: Formata a segunda string (endereço IP) sem formatação adicional.
+                        # O que faz o \n: Adiciona uma quebra de linha no final do registo.
+                        # O que faz o |: Operador pipe que envia a saída do printf para o próximo comando.
+                        # O que faz o sudo tee -a: Anexa (append) o conteúdo ao ficheiro especificado com privilégios de root. O -a significa append mode.
+                        # O que faz o /var/named/${DOMINIO}.db: Caminho do ficheiro de zona onde o registo será adicionado.
+                        # O que faz o >/dev/null: Descarta a saída do tee (que normalmente imprime na tela), mantendo a interface limpa.
+
+                        printf "%-20s IN      A       %s\n" "$NOME_HOST" "$IP_HOST" | sudo tee -a /var/named/${DOMINIO}.db >/dev/null
+
+                        # 21.1.4.2 - Limpa eventuais espaços não-quebráveis (NBSP) que possam existir no ficheiro
+                        # O que faz: Substitui todos os espaços não-quebráveis (non-breaking spaces) por espaços normais no ficheiro de zona.
+
+                        # O que faz o sudo sed -i: Edita o ficheiro diretamente com privilégios de superutilizador.
+                        # O que faz o s/padrão/substituição/g: Comando de substituição global (o g no final significa "global" - todas as ocorrências na linha).
+                        # O que faz o \xC2\xA0: Sequência hexadecimal UTF-8 que representa o carácter NBSP (non-breaking space, código Unicode U+00A0). Em UTF-8, este carácter é codificado como os bytes 0xC2 0xA0.
+                        # O que faz o espaço após a barra: Espaço ASCII normal (0x20) que substitui o NBSP.
                         
+                        # Por que é necessário: Espaços não-quebráveis podem ser copiados acidentalmente de editores de texto ou documentos e causam erros de parsing no BIND, pois o servidor DNS espera apenas espaços ASCII normais.
+
+                        # Problema que resolve: O BIND pode falhar na validação da zona se existirem caracteres invisíveis não-ASCII, mesmo que visualmente o ficheiro pareça correto.
+
+                        # Exemplo prático: Corrige pc1[NBSP]IN[NBSP]A para pc1 IN A (onde [NBSP] é invisível mas problemático).
+
+                        sudo sed -i 's/\xC2\xA0/ /g' /var/named/${DOMINIO}.db
+
                         echo ""
                         echo "Registo adicionado com sucesso!"
                         echo "${NOME_HOST}.${DOMINIO} → ${IP_HOST}"
@@ -782,87 +812,178 @@ EOF
                         # O que faz o d: Comando do sed para deletar a linha selecionada.
                         # O que faz o sleep 0.5: Pausa a execução por 1 segundo para melhor legibilidade.
 
-                        if sudo named-checkzone ${DOMINIO} /var/named/${DOMINIO}.db >/dev/null 2>&1; then
+                        # Extrair Serial atual de forma confiável
+                        # O que faz: Verifica se a variável CURRENT_SERIAL está vazia (não conseguiu extrair o serial)
 
-                            sudo rndc reload
-                            echo "Zona recarregada com sucesso!"
+                        CURRENT_SERIAL=$(grep -Po '(?<=\s)[0-9]{10}(?=\s*;)' /var/named/${DOMINIO}.db | head -n 1)
 
+                        # 21.1.5.1 - Se a extração falhar (não encontrou número), criar um novo serial
+                        # O que faz: 
+
+                        # O que faz o [[ -z ]]: Operador de teste que retorna verdadeiro se a string está vazia (zero length).
+                        # O que faz o if: Inicia uma estrutura condicional que executa código diferente conforme a condição.
+
+                        if [[ -z "$CURRENT_SERIAL" ]]; then
+                            NEW_SERIAL=$(date +%Y%m%d01)
                         else
+                            # 21.1.6.1 - Incrementar de forma segura (10# força decimal, evitando octal)
+                            # O que faz: Incrementa o serial atual em 1 unidade, garantindo interpretação decimal.
 
-                            echo "Erro 21.1.5! Zona direta inválida após alteração!"
-                            echo "A reverter alterações..."
+                            # O que faz o date +%Y%m%d01: Gera uma string com ano (4 dígitos), mês (2 dígitos), dia (2 dígitos) e contador 01.
+                            # Exemplo: Para 06/11/2025 gera 2025110601 (formato padrão de seriais DNS).
+                            # O que faz o $(( )): Realiza operações aritméticas em bash (avaliação de expressões matemáticas).
+                            # O que faz o 10#: Prefixo que força a interpretação do número como decimal (base 10), evitando problemas com números iniciados por zero que seriam tratados como octais (base 8).
+                            # Por que é importante: Seriais como 2025110608 contêm o dígito 8, que é inválido em octal, causando erro sem o prefixo 10#.
 
-                            # Remover a última linha adicionada em caso de erro
 
-                            sudo sed -i '$ d' /var/named/${DOMINIO}.db
+                            NEW_SERIAL=$((10#$CURRENT_SERIAL + 1))
                         fi
+
+                        # 21.1.7.1 - Atualizar o serial no ficheiro de zona
+                        # O que faz: 
+
+                        sudo sed -i "s/[0-9]\{10\} ; Serial/$NEW_SERIAL ; Serial/" /var/named/${DOMINIO}.db
                         
+                        # 21.1.8.1 - Validar o ficheiro após a alteração
+                        # O que faz: Substitui o número de serial antigo (10 dígitos) pelo novo serial incrementado no ficheiro de zona DNS, mantendo o comentário "; Serial".
+
+                        # O que faz o sudo: Executa o comando com privilégios de superutilizador (root), necessário porque o ficheiro está em /var/named/.
+                        # O que faz o sed -i: Editor de stream que modifica ficheiros de texto. O parâmetro -i edita o ficheiro diretamente (in-place) sem criar cópia temporária.
+                        # O que faz o s/padrão/substituição/: Comando de substituição do sed. Procura o padrão e substitui pela nova string.
+                        # O que faz o [0-9]\{10\}: Expressão regular que corresponde a exatamente 10 dígitos consecutivos (o serial antigo).
+
+                        # [0-9] = qualquer dígito de 0 a 9
+                        # \{10\} = exatamente 10 ocorrências
+
+                        # O que faz o  ; Serial: Parte fixa do padrão que identifica a linha correta (o comentário após o número do serial).
+                        # O que faz o $NEW_SERIAL ; Serial: String de substituição que insere o novo serial seguido do mesmo comentário.
+                        # O que faz o /var/named/${DOMINIO}.db: Caminho do ficheiro de zona a ser editado, onde ${DOMINIO} é expandido para o nome do domínio configurado.
+                        # Exemplo prático: Transforma 2025110601 ; Serial em 2025110602 ; Serial
+
+                        if sudo named-checkzone "${DOMINIO}" "/var/named/${DOMINIO}.db" >/dev/null 2>&1; then
+                            sudo rndc reload >/dev/null 2>&1
+                            echo "Zona ${DOMINIO} recarregada com sucesso! (SeriaLoil atualizado para $NEW_SERIAL)"
+                        else
+                            echo "Erro 21.1.5 — Zona inválida após alteração. A reverter..."
+                            sudo sed -i "s/$NEW_SERIAL ; Serial/$CURRENT_SERIAL ; Serial/" /var/named/${DOMINIO}.db
+                            sudo sed -i '$ d' /var/named/${DOMINIO}.db   # Remove o último registo adicionado
+                            echo "Reversão concluída. Nenhuma alteração permanente foi aplicada."
+                        fi
+
                         sleep 0.5
                         ;;
                         
                     2)
-                        # 21.1.6 - Adicionar registo à zona inversa (PTR Record)
-                        # O que faz: Adiciona um registo que permite resolver IP para nome.
-                        
-                        echo ""
-                        echo "--- Adicionar IP para Nome (zona inversa) ---"
-                        echo ""
-                        read -p "Último octeto do IP (ex: para 192.168.0.20, digite 20): " ULTIMO_OCTETO
-                        read -p "Nome completo do host (ex: pc1.${DOMINIO}): " NOME_COMPLETO
-                        
-                        # 21.1.7 - Adição do ponto final caso não exista.
-                        # O que faz: Garante que o FQDN (Fully Qualified Domain Name) termina com ponto.
+                            # 21.1.6 - Adicionar registo à zona inversa (PTR Record)
+                            # O que faz: Adiciona um registo que permite resolver IP para nome.
+                            
+                            echo ""
+                            echo "--- Adicionar IP para Nome (zona inversa) ---"
+                            echo ""
+                            read -p "Último octeto do IP (ex: para 192.168.0.20, digite 20): " ULTIMO_OCTETO
+                            read -p "Nome do host sem domínio (ex: pc1): " NOME_HOST_SIMPLES
+                            
+                            # 21.1.7 - Construir FQDN correto
+                            # O que faz: Garante que o FQDN está no formato correto com ponto final.
+                            
+                            NOME_COMPLETO="${NOME_HOST_SIMPLES}.${DOMINIO}."
+                            
+                            # 21.1.8 - Incrementação da serial da zona inversa (reverse zone)
+                            # Extrair Serial atual de forma confiável
 
-                        # O que faz o =~ \.$: Verifica se a string termina com um ponto.
-                        # O que faz o ${NOME_COMPLETO}.: Adiciona um ponto ao final do nome se necessário.
+                            CURRENT_SERIAL=$(grep -Po '(?<=\s)[0-9]{10}(?=\s*;)' /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db | head -n 1)
+                            
+                            # 21.1.8.1 - Se a extração falhar, criar um novo serial
 
-                        if [[ ! "$NOME_COMPLETO" =~ \.$ ]]; then
-                            NOME_COMPLETO="${NOME_COMPLETO}."
-                        fi
-                        
-                        # 21.1.8 - Incrementação da serial da zona inversa (reverse zone)
-                        # O que faz: Atualiza o número de série para que outros servidores DNS saibam que a zona mudou.
+                            if [[ -z "$CURRENT_SERIAL" ]]; then
+                                NEW_SERIAL=$(date +%Y%m%d01)
+                            else
+                                # 21.1.8.2 - Incrementar de forma segura
+                                # O que faz: Incrementa o serial atual da zona inversa em 1 unidade, garantindo interpretação decimal do número.
 
-                        # O que faz o sed: Stream editor - ferramenta para procurar e substituir texto em ficheiros.
-                        # O que faz o -i: Edita o ficheiro diretamente (in-place).
-                        # O que faz o "s/ANTIGO/NOVO/": Substitui a primeira ocorrência de ANTIGO por NOVO.
-                        # O que faz o date +%s: Gera um número de série baseado no timestamp Unix (segundos desde 1 janeiro 1970).
+                                # O que faz o $(( )): Realiza operações aritméticas em bash (avaliação de expressões matemáticas).
+                                # O que faz o 10#: Prefixo que força a interpretação do número como decimal (base 10), evitando que números iniciados por zero sejam tratados como octais (base 8).
+                                # O que faz o $CURRENT_SERIAL: Variável que contém o serial atual extraído do ficheiro de zona inversa.
+                                # O que faz o + 1: Adiciona 1 ao valor do serial atual.
+                                # Por que o 10# é crítico: Seriais DNS frequentemente contêm dígitos 8 ou 9 (ex: 2025110608). Sem o prefixo 10#, o bash tentaria interpretar como octal e falharia, pois 8 e 9 não existem no sistema octal (apenas 0-7 são válidos).
+                                # Exemplo prático: 2025110608 → 2025110609
 
-                        NOVO_SERIAL=$(date +%s)
-                        sudo sed -i "s/${SERIAL_DATE}/${NOVO_SERIAL}/" /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
-                        SERIAL_DATE=$NOVO_SERIAL
-                        
-                        # 21.1.9 - Adicionar o registo PTR ao ficheiro de zona inversa
-                        # O que faz: Anexa uma nova linha ao ficheiro com o registo DNS tipo PTR.
+                                NEW_SERIAL=$((10#$CURRENT_SERIAL + 1))
+                            fi
+                            
+                            # 21.1.8.3 - Atualizar o serial no ficheiro de zona inversa
+                            # O que faz: Substitui o número de serial antigo pelo novo serial no ficheiro de zona inversa (PTR), preservando o comentário "; Serial".
 
-                        echo "${ULTIMO_OCTETO}  IN  PTR   ${NOME_COMPLETO}" | sudo tee -a /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null
-                        
-                        echo ""
-                        echo "Registo inverso adicionado com sucesso!"
-                        echo "  ${OCTETO_1}.${OCTETO_2}.${OCTETO_3}.${ULTIMO_OCTETO} -> ${NOME_COMPLETO}"
-                        
-                        # 21.1.10 - Validar a zona inversa após alteração
-                        # O que faz: Verifica se o ficheiro de zona inversa está correto após a adição do novo registo.
+                            # O que faz o sudo: Executa o comando com privilégios de superutilizador (root), necessário para editar ficheiros em /var/named/.
+                            # O que faz o sed -i: Editor de stream que modifica ficheiros. O parâmetro -i edita o ficheiro diretamente (in-place) sem criar ficheiro temporário.
+                            # O que faz o s/padrão/substituição/: Comando de substituição do sed. Procura o padrão especificado e substitui pela nova string.
+                            # O que faz o [0-9]\{10\}: Expressão regular que corresponde a exatamente 10 dígitos consecutivos (o serial antigo).
+                            # O que faz o \s*: Expressão regular que corresponde a zero ou mais espaços em branco (whitespace). Permite flexibilidade no formato do ficheiro.
+                            # O que faz o ;: Carácter literal ponto e vírgula que faz parte do comentário DNS.
+                            # O que faz o Serial: Palavra-chave que identifica a linha correta do serial no ficheiro de zona.
+                            # O que faz o $NEW_SERIAL ; Serial: String de substituição que insere o novo serial com formato padronizado (um espaço antes e depois do ponto e vírgula).
+                            # O que faz o /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db: Caminho do ficheiro de zona inversa, onde as variáveis são expandidas para formar o nome correto (ex: 0.168.192.db para a rede 192.168.0.0).
+                            # Diferença para a zona direta: Esta versão usa \s* para tolerar variações de espaçamento no ficheiro de zona inversa.
+                            # Exemplo prático: Transforma 2025110601   ;   Serial em 2025110602 ; Serial
 
-                        # O que faz o rndc reload: Recarrega as zonas DNS sem reiniciar o serviço BIND.
-                        # O que faz o if ... then ... else: Estrutura condicional baseada no sucesso/falha do comando.
-                        # O que faz o sed -i '$ d': Remove a última linha do ficheiro (em caso de erro).
-                        # O que faz o $: Representa a última linha do ficheiro.
-                        # O que faz o d: Comando do sed para deletar a linha selecionada.
-                        # O que faz o sleep 0.5: Pausa a execução por meio segundo para melhor legibilidade.
+                            sudo sed -i "s/[0-9]\{10\}\s*;\s*Serial/$NEW_SERIAL ; Serial/" /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
+                            
+                            # 21.1.9 - Adicionar o registo PTR ao ficheiro de zona inversa
+                            # O que faz: Anexa uma nova linha ao ficheiro com o registo DNS tipo PTR.
+                            
+                            printf "%-4s IN  PTR   %s\n" "$ULTIMO_OCTETO" "$NOME_COMPLETO" | sudo tee -a /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null
+                            
+                            echo ""
+                            echo "Registo inverso adicionado:"
+                            echo "  ${OCTETO_1}.${OCTETO_2}.${OCTETO_3}.${ULTIMO_OCTETO} -> ${NOME_COMPLETO}"
+                            
+                            # 21.1.10 - Validar a zona inversa após alteração
+                            # O que faz: Verifica se o ficheiro de zona inversa está sintaticamente correto após a adição do registo PTR.
 
-                        if sudo named-checkzone ${REVERSE_ZONE_ID} /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null 2>&1; then
-                            sudo rndc reload
-                            echo "Reverse zone recarregada com sucesso!"
+                            # O que faz o sudo named-checkzone: Ferramenta do BIND que valida a sintaxe e integridade de ficheiros de zona DNS.
+                            # O que faz o ${REVERSE_ZONE_ID}: Variável com o identificador da zona inversa (ex: 0.168.192.in-addr.arpa).
+                            # O que faz o /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db: Caminho do ficheiro de zona inversa a validar.
+                            # O que faz o >/dev/null 2>&1: Redireciona toda a saída (standard output e errors) para /dev/null, ocultando mensagens.
+                            # O que faz o if ... then: Estrutura condicional que executa código diferente conforme o sucesso/falha da validação.
+                            # O que faz o sudo rndc reload >/dev/null 2>&1: Comando de controlo remoto do BIND que força o servidor a reler os ficheiros de zona.
+                            
+                            if sudo named-checkzone ${REVERSE_ZONE_ID} /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db >/dev/null 2>&1; then
+                                sudo rndc reload >/dev/null 2>&1
+                                echo "Zona inversa recarregada com sucesso! (Serial: $NEW_SERIAL)"
+                            else
+                                echo "Erro 21.1.10! Zona inversa inválida após alteração!"
+                                echo "  A reverter alterações..."
 
-                        else
-                            echo "Erro 21.1.10! Reverse zone inválida após alteração!"
-                            echo "  A reverter alterações..."
-                            sudo sed -i '$ d' /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
-                        fi
-                        
-                        sleep 0.5
-                        ;;
+                                # 21.1.10.1 - Reverter o serial
+                                # O que faz: Restaura o serial antigo no ficheiro de zona inversa, desfazendo a alteração.
+
+                                # O que faz o sed -i: Edita o ficheiro diretamente (in-place), substituindo texto.
+                                # O que faz o s/$NEW_SERIAL ; Serial/$CURRENT_SERIAL ; Serial/: Comando de substituição que procura o novo serial e o substitui pelo serial original.
+                                # Por que é necessário: Se a zona ficou inválida, precisamos desfazer todas as alterações para manter o ficheiro funcional.
+
+                                sudo sed -i "s/$NEW_SERIAL ; Serial/$CURRENT_SERIAL ; Serial/" /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
+
+                                # 21.1.10.2 - Remover o último registo adicionado
+                                # O que faz: Remove a última linha do ficheiro de zona inversa (o registo PTR que causou o erro).
+
+                                # O que faz o sed -i '$ d': Comando sed para apagar linhas. O $ representa a última linha do ficheiro, e d é o comando delete.
+                                # Por que é necessário: O registo PTR recém-adicionado estava incorreto ou mal formatado, então precisa ser removido.
+
+                                sudo sed -i '$ d' /var/named/${OCTETO_3}.${OCTETO_2}.${OCTETO_1}.db
+                                echo "Reversão concluída. Verifique o formato dos dados introduzidos."
+                            fi
+                            
+                            # 21.1.10.3 - Atualizar a variável SERIAL_DATE
+                            # O que faz: Atualiza a variável SERIAL_DATE com o valor do novo serial, mantendo o estado sincronizado.
+
+                            # Por que é necessário: Esta variável pode ser usada posteriormente no script para referência ou logs, garantindo que contém sempre o serial mais recente aplicado com sucesso.
+
+                            # Contexto: Mesmo que a validação tenha falhado e revertido, se chegou aqui é porque passou pela validação (está dentro do bloco then de sucesso).
+
+                            SERIAL_DATE=$NEW_SERIAL
+                            
+                            sleep 0.5
+                            ;;
                         
                     3)
                         # 21.1.11 - Ver registos existentes
@@ -1006,6 +1127,8 @@ EOF
                         break
                         ;;
                 esac
+            else
+                break
             fi
         done
 
