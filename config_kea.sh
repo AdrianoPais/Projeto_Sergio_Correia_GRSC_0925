@@ -100,7 +100,7 @@ done
 
 VERIFICACAO=""
 
-while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
+while [ "$VERIFICACAO" != "y" ] || [ "$VERIFICACAO" != "Y" ]; do
 
     # 4.1 - Solicitar o escopo de IPs desejado e gateway/DNS
     # O que faz: Pede ao utilizador apenas o 4º octeto do range, gateway e DNS, para formar os IPs completos
@@ -173,7 +173,6 @@ while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
     echo "Resumo dos IPs configurados (Sub-rede: $IP_SUBNET_SERVIDOR_C):"
     echo "---------------------------------------------------------"
     echo "IP Servidor Estático: $IP_SERVIDOR (Fora do range DHCP)"
-    echo "IP Gateway/Router:    $IP_GATEWAY"
     echo "IP DNS BIND:          $IP_DNS"
     echo "Range DHCP (Início): $IP_RANGE_INICIO"
     echo "Range DHCP (Fim):     $IP_RANGE_FIM"
@@ -225,7 +224,7 @@ echo "Feito!"
 
 read -p "Deseja que os clientes tenham acesso à Internet? (y/N): " ACESSO_INTERNET
 
-if [ "$ACESSO_INTERNET" == "y" ] && [ "$ACESSO_INTERNET" == "Y" ]; then
+if [ "$ACESSO_INTERNET" == "y" ] || [ "$ACESSO_INTERNET" == "Y" ]; then
 
     ACESSO=1
     # 5.1 - Definir o GATEWAY para a rede DHCP: É O PRÓPRIO SERVIDOR (DHCP/NAT)
