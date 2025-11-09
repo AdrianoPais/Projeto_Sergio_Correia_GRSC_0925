@@ -100,7 +100,7 @@ done
 
 VERIFICACAO=""
 
-while [ "$VERIFICACAO" != "y" ] || [ "$VERIFICACAO" != "Y" ]; do
+while [ "$VERIFICACAO" != "y" ] && [ "$VERIFICACAO" != "Y" ]; do
 
     # 4.1 - Solicitar o escopo de IPs desejado e gateway/DNS
     # O que faz: Pede ao utilizador apenas o 4º octeto do range, gateway e DNS, para formar os IPs completos
@@ -816,4 +816,5 @@ echo "Recomenda-se um reboot do sistema para garantir que todas as alterações 
 echo "Para reiniciar o sistema, execute: reboot"
 
 #reboot - Caso queira reiniciar automaticamente, descomente esta linha.
+
 
